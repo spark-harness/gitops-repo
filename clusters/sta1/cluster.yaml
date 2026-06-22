@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-cluster-metadata
+  namespace: argocd
+data:
+  environment: sta1
+  namespace: spark-sta1
+  description: Spark STA1 cluster entry.

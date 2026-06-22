@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: applicant-api
+  labels:
+    app.kubernetes.io/name: applicant-api
+    app.kubernetes.io/part-of: spark
+spec:
+  selector:
+    app.kubernetes.io/name: applicant-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

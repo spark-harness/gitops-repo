@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: applicant-api-sta2
+  namespace: argocd
+spec:
+  project: spark-sta2
+  source:
+    repoURL: https://github.com/spark-harness/gitops-repo.git
+    targetRevision: main
+    path: apps/applicant-api/overlays/sta2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spark-sta2
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
