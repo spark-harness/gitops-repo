@@ -7,7 +7,7 @@ spec:
   project: spark-prod
   source:
     repoURL: https://github.com/spark-harness/gitops-repo.git
-    targetRevision: main
+    targetRevision: master
     path: apps/applicant-api/overlays/prod
   destination:
     server: https://kubernetes.default.svc

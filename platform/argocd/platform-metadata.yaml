@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-argocd-metadata
+  namespace: argocd
+data:
+  owner: spark-platform
+  purpose: Argo CD platform entry for Spark GitOps environments.
