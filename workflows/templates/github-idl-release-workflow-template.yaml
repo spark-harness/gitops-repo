@@ -25,7 +25,7 @@ spec:
       - name: commit-sha
       - name: ref
       - name: janus-image
-        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-54-bootstrap-20260623-1423
+        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-54-bootstrap-20260623-1608
       - name: go-image
         value: golang:1.26-bookworm
       - name: maven-image
