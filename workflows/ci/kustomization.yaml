@@ -4,3 +4,4 @@ resources:
   - github-sensor-rbac.yaml
   - github-webhook-eventsource.yaml
   - github-pr-smoke-sensor.yaml
+  - github-repo-gates-sensor.yaml

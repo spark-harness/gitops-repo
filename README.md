@@ -58,12 +58,12 @@ workflows/
 ## Workflow
 
 - `workflows/templates/`：可复用的 Argo WorkflowTemplate。
-- `workflows/ci/`：由 GitHub Actions 或 Argo Events 触发的 CI/CD workflow 入口。
+- `workflows/ci/`：由 Argo Events 触发的 CI/CD workflow 入口。
 
 推荐边界：
 
-- branch push 触发单元测试 workflow。
-- PR 触发 gate workflow，并通过 GitHub required check 控制合并。
+- GitHub webhook 只负责把仓库事件送入 Argo Events。
+- PR 触发 Argo gate workflow，并通过 GitHub required status 控制合并。
 - merge 后 release workflow 构建或复用已验证镜像，并更新本仓库中的 image tag 或 digest。
 
 镜像发布策略：

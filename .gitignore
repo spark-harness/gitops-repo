@@ -4,3 +4,5 @@
 .env
 .env.*
 !.env.example
+images/janus-runner/janus/*
+!images/janus-runner/janus/.gitkeep
