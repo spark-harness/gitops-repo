@@ -6,6 +6,7 @@ It contains:
 
 - `janus`
 - `git`
+- `gh`
 - `buf`
 - Go toolchain
 - JDK 17 and Maven
