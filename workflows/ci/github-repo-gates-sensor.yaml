@@ -1,0 +1,618 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: github-repo-gates
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: github-sensor
+  dependencies:
+    - name: harness-repo-pr
+      eventSourceName: github
+      eventName: harness-repo
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+              - edited
+          - path: body.pull_request.state
+            type: string
+            value:
+              - open
+    - name: business-repo-pr
+      eventSourceName: github
+      eventName: business-repo
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+              - edited
+          - path: body.pull_request.state
+            type: string
+            value:
+              - open
+    - name: idl-repo-pr
+      eventSourceName: github
+      eventName: idl-repo
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+              - edited
+          - path: body.pull_request.state
+            type: string
+            value:
+              - open
+    - name: idl-repo-push
+      eventSourceName: github
+      eventName: idl-repo
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value:
+              - push
+  triggers:
+    - template:
+        name: harness-gates
+        conditions: harness-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: harness-repo-gates-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: harness-gates
+                    - name: status-context
+                      value: spark/harness-gates
+          parameters:
+            - src: {dependencyName: harness-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: harness-delivery-readiness
+        conditions: harness-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: harness-repo-delivery-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: delivery-readiness
+                    - name: status-context
+                      value: spark/harness-delivery-readiness
+          parameters:
+            - src: {dependencyName: harness-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: harness-pr-metadata
+        conditions: harness-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: harness-repo-pr-metadata-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: pr-metadata
+                    - name: status-context
+                      value: spark/pr-metadata
+          parameters:
+            - src: {dependencyName: harness-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: harness-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: business-pr-metadata
+        conditions: business-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-repo-pr-metadata-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: pr-metadata
+                    - name: status-context
+                      value: spark/pr-metadata
+          parameters:
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: idl-pr-metadata
+        conditions: idl-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: idl-repo-pr-metadata-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: pr-metadata
+                    - name: status-context
+                      value: spark/pr-metadata
+          parameters:
+            - src: {dependencyName: idl-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: fides-ci
+        conditions: business-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-repo-fides-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: fides-ci
+                    - name: status-context
+                      value: spark/fides-ci
+          parameters:
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: fides-bff-ci
+        conditions: business-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-repo-fides-bff-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: fides-bff-ci
+                    - name: status-context
+                      value: spark/fides-bff-ci
+          parameters:
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: contract-dependency-scan
+        conditions: business-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-repo-contract-scan-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: contract-dependency-scan
+                    - name: status-context
+                      value: spark/contract-dependency-scan
+          parameters:
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: business-delivery-readiness
+        conditions: business-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-repo-delivery-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: delivery-readiness
+                    - name: status-context
+                      value: spark/business-delivery-readiness
+          parameters:
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: idl-contract-gate
+        conditions: idl-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: idl-repo-contract-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: idl-contract-gate
+                    - name: status-context
+                      value: spark/idl-contract-gate
+          parameters:
+            - src: {dependencyName: idl-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: idl-delivery-readiness
+        conditions: idl-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: idl-repo-delivery-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: delivery-readiness
+                    - name: status-context
+                      value: spark/idl-delivery-readiness
+          parameters:
+            - src: {dependencyName: idl-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: idl-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
+        name: idl-release
+        conditions: idl-repo-push
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: idl-repo-release-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-idl-release
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: ref
+          parameters:
+            - src: {dependencyName: idl-repo-push, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: idl-repo-push, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: idl-repo-push, dataKey: body.after}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: idl-repo-push, dataKey: body.ref}
+              dest: spec.arguments.parameters.3.value

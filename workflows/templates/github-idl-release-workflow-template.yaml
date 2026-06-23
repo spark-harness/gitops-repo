@@ -1,0 +1,354 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: github-idl-release
+  namespace: argo
+spec:
+  entrypoint: run
+  serviceAccountName: argo
+  imagePullSecrets:
+    - name: aliyun-registry
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 8Gi
+  arguments:
+    parameters:
+      - name: repo-owner
+      - name: repo-name
+        value: idl-repo
+      - name: commit-sha
+      - name: ref
+      - name: janus-image
+        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-54-bootstrap-20260623-1608
+      - name: go-image
+        value: golang:1.26-bookworm
+      - name: maven-image
+        value: maven:3.9.9-eclipse-temurin-17
+      - name: go-idl-repository
+        value: spark-harness/idl-go-repo
+      - name: java-idl-repository
+        value: spark-harness/idl-java-repo
+      - name: go-base-branch
+        value: master
+      - name: java-base-branch
+        value: master
+      - name: maven-package-name
+        value: com.spark.contract.spark-idl-java
+  templates:
+    - name: run
+      steps:
+        - - name: checkout-idl
+            template: checkout-idl
+        - - name: sync-go
+            template: sync-go
+        - - name: sync-java
+            template: sync-java
+        - - name: publish-go
+            template: publish-go
+        - - name: publish-java
+            template: publish-java
+
+    - name: checkout-idl
+      container:
+        image: alpine/git:2.47.2
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            rm -rf /workspace/idl-repo
+            git clone --filter=blob:none --no-checkout \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}.git" \
+              /workspace/idl-repo
+            cd /workspace/idl-repo
+            git fetch --depth 100 origin "{{workflow.parameters.commit-sha}}"
+            git checkout --detach "{{workflow.parameters.commit-sha}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: sync-go
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: IDL_GO_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: BRANCH_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: GO_IDL_REPOSITORY
+            value: "{{workflow.parameters.go-idl-repository}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${BRANCH_NAME}" != refs/heads/* ]]; then
+              echo "Not a branch push; skipping Go sync for ${BRANCH_NAME}."
+              exit 0
+            fi
+            BRANCH_NAME="${BRANCH_NAME#refs/heads/}"
+            test -n "${IDL_GO_REPO_TOKEN}"
+            git clone --filter=blob:none "https://x-access-token:${IDL_GO_REPO_TOKEN}@github.com/${GO_IDL_REPOSITORY}.git" idl-go-repo
+            cd idl-go-repo
+            if git ls-remote --exit-code --heads origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+              git fetch --depth 100 origin "${BRANCH_NAME}"
+              git checkout -B "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
+              branch_exists=true
+            else
+              git checkout -B "${BRANCH_NAME}"
+              branch_exists=false
+            fi
+            cd /workspace/idl-repo
+            buf generate --template buf.gen.go.yaml
+            rm -rf /workspace/idl-go-repo/vesta
+            cp -R /workspace/.generated/idl-go/. /workspace/idl-go-repo/
+            cd /workspace/idl-go-repo
+            go mod tidy
+            go test ./...
+            git config user.name "spark-argo"
+            git config user.email "spark-argo@users.noreply.github.com"
+            git add -A
+            if git diff --cached --quiet; then
+              if [ "${branch_exists}" != "true" ]; then
+                git push origin "HEAD:${BRANCH_NAME}"
+              fi
+              exit 0
+            fi
+            git commit -m "chore(idl): sync go generated code from ${IDL_COMMIT:0:12}"
+            git push origin "HEAD:${BRANCH_NAME}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: sync-java
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: IDL_JAVA_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: BRANCH_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: JAVA_IDL_REPOSITORY
+            value: "{{workflow.parameters.java-idl-repository}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${BRANCH_NAME}" != refs/heads/* ]]; then
+              echo "Not a branch push; skipping Java sync for ${BRANCH_NAME}."
+              exit 0
+            fi
+            BRANCH_NAME="${BRANCH_NAME#refs/heads/}"
+            test -n "${IDL_JAVA_REPO_TOKEN}"
+            git clone --filter=blob:none "https://x-access-token:${IDL_JAVA_REPO_TOKEN}@github.com/${JAVA_IDL_REPOSITORY}.git" idl-java-repo
+            cd idl-java-repo
+            if git ls-remote --exit-code --heads origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+              git fetch --depth 100 origin "${BRANCH_NAME}"
+              git checkout -B "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
+              branch_exists=true
+            else
+              git checkout -B "${BRANCH_NAME}"
+              branch_exists=false
+            fi
+            cd /workspace/idl-repo
+            buf generate
+            cd /workspace/idl-java-repo
+            mvn -B test
+            git config user.name "spark-argo"
+            git config user.email "spark-argo@users.noreply.github.com"
+            git add -A
+            if git diff --cached --quiet; then
+              if [ "${branch_exists}" != "true" ]; then
+                git push origin "HEAD:${BRANCH_NAME}"
+              fi
+              exit 0
+            fi
+            git commit -m "chore(idl): sync java generated code from ${IDL_COMMIT:0:12}"
+            git push origin "HEAD:${BRANCH_NAME}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: publish-go
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: IDL_GO_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: TAG_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+          - name: GO_IDL_REPOSITORY
+            value: "{{workflow.parameters.go-idl-repository}}"
+          - name: GO_BASE_BRANCH
+            value: "{{workflow.parameters.go-base-branch}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${TAG_NAME}" != refs/tags/* ]]; then
+              echo "Not a tag push; skipping Go publish for ${TAG_NAME}."
+              exit 0
+            fi
+            TAG_NAME="${TAG_NAME#refs/tags/}"
+            if [[ "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              release_channel=formal
+              go_tag="${TAG_NAME}"
+            elif [[ "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[A-Z][A-Z0-9]*-[0-9]+\.[0-9]{8}\.[0-9a-f]{7,40}$ ]]; then
+              release_channel=rc
+              go_tag="${TAG_NAME}"
+              tag_sha="${go_tag##*.}"
+              [[ "${IDL_COMMIT}" == "${tag_sha}"* ]]
+            else
+              echo "Publish tag must be SemVer vMAJOR.MINOR.PATCH or RC vMAJOR.MINOR.PATCH-rc.TICKET.YYYYMMDD.IDL_SHA." >&2
+              exit 1
+            fi
+            if git ls-remote --exit-code --tags "https://x-access-token:${IDL_GO_REPO_TOKEN}@github.com/${GO_IDL_REPOSITORY}.git" "refs/tags/${go_tag}" >/dev/null 2>&1; then
+              echo "Go IDL tag ${go_tag} already exists in ${GO_IDL_REPOSITORY}." >&2
+              exit 1
+            fi
+            git clone --filter=blob:none --branch "${GO_BASE_BRANCH}" "https://x-access-token:${IDL_GO_REPO_TOKEN}@github.com/${GO_IDL_REPOSITORY}.git" idl-go-repo
+            cd /workspace/idl-repo
+            buf generate --template buf.gen.go.yaml
+            rm -rf /workspace/idl-go-repo/vesta
+            cp -R /workspace/.generated/idl-go/. /workspace/idl-go-repo/
+            cd /workspace/idl-go-repo
+            go mod tidy
+            go test ./...
+            git config user.name "spark-argo"
+            git config user.email "spark-argo@users.noreply.github.com"
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(idl): publish go generated code for ${IDL_COMMIT:0:12}"
+              if [ "${release_channel}" = "formal" ]; then
+                git push origin "HEAD:${GO_BASE_BRANCH}"
+              fi
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/${go_tag}" >/dev/null 2>&1; then
+              echo "Go IDL tag ${go_tag} already exists in ${GO_IDL_REPOSITORY}." >&2
+              exit 1
+            fi
+            git tag "${go_tag}"
+            git push origin "refs/tags/${go_tag}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: publish-java
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: IDL_JAVA_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: GITHUB_ACTOR
+            value: spark-argo
+          - name: TAG_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+          - name: JAVA_IDL_REPOSITORY
+            value: "{{workflow.parameters.java-idl-repository}}"
+          - name: JAVA_BASE_BRANCH
+            value: "{{workflow.parameters.java-base-branch}}"
+          - name: MAVEN_PACKAGE_NAME
+            value: "{{workflow.parameters.maven-package-name}}"
+          - name: GITHUB_REPOSITORY_OWNER
+            value: "{{workflow.parameters.repo-owner}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${TAG_NAME}" != refs/tags/* ]]; then
+              echo "Not a tag push; skipping Java publish for ${TAG_NAME}."
+              exit 0
+            fi
+            TAG_NAME="${TAG_NAME#refs/tags/}"
+            if [[ "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              java_version="${TAG_NAME#v}"
+            elif [[ "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[A-Z][A-Z0-9]*-[0-9]+\.[0-9]{8}\.[0-9a-f]{7,40}$ ]]; then
+              java_version="${TAG_NAME#v}"
+              version_sha="${java_version##*.}"
+              [[ "${IDL_COMMIT}" == "${version_sha}"* ]]
+            else
+              echo "Publish tag must be SemVer vMAJOR.MINOR.PATCH or RC vMAJOR.MINOR.PATCH-rc.TICKET.YYYYMMDD.IDL_SHA." >&2
+              exit 1
+            fi
+            set +e
+            versions_json="$(curl -fsS \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/orgs/${GITHUB_REPOSITORY_OWNER}/packages/maven/${MAVEN_PACKAGE_NAME}/versions" \
+              2>/tmp/api-error.txt)"
+            status="$?"
+            set -e
+            if [ "${status}" -ne 0 ]; then
+              grep -q '404' /tmp/api-error.txt || { cat /tmp/api-error.txt; exit "${status}"; }
+            elif jq -e --arg version "${java_version}" '.[] | select(.name == $version)' <<<"${versions_json}" >/dev/null; then
+              echo "Maven package version ${java_version} already exists for ${MAVEN_PACKAGE_NAME}." >&2
+              exit 1
+            fi
+            git clone --filter=blob:none --branch "${JAVA_BASE_BRANCH}" "https://x-access-token:${IDL_JAVA_REPO_TOKEN}@github.com/${JAVA_IDL_REPOSITORY}.git" idl-java-repo
+            cd /workspace/idl-repo
+            buf generate
+            cd /workspace/idl-java-repo
+            export JAVA_VERSION="${java_version}"
+            prepare_maven_version.py
+            mkdir -p ~/.m2
+            printf '%s\n' \
+              '<settings>' \
+              '  <servers>' \
+              '    <server>' \
+              '      <id>github</id>' \
+              "      <username>${GITHUB_ACTOR}</username>" \
+              "      <password>${IDL_JAVA_REPO_TOKEN}</password>" \
+              '    </server>' \
+              '  </servers>' \
+              '</settings>' \
+              > ~/.m2/settings.xml
+            mvn -B deploy
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace

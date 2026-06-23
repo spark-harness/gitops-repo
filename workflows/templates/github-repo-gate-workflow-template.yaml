@@ -1,0 +1,441 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: github-repo-gate
+  namespace: argo
+spec:
+  entrypoint: run
+  serviceAccountName: argo
+  onExit: report-failure
+  imagePullSecrets:
+    - name: aliyun-registry
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 8Gi
+  arguments:
+    parameters:
+      - name: repo-owner
+      - name: repo-name
+      - name: commit-sha
+      - name: pr-number
+        value: ""
+      - name: source-ref
+        value: master
+      - name: base-ref
+        value: master
+      - name: head-ref
+        value: master
+      - name: gate-kind
+      - name: status-context
+      - name: janus-image
+        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-54-bootstrap-20260623-1608
+      - name: buf-image
+        value: bufbuild/buf:1.47.2
+      - name: node-image
+        value: node:22-bookworm
+      - name: go-image
+        value: golang:1.26-bookworm
+      - name: python-image
+        value: python:3.13-bookworm
+  templates:
+    - name: run
+      steps:
+        - - name: pending
+            template: github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: pending
+                - name: description
+                  value: Spark Argo gate started
+        - - name: checkout-source
+            template: checkout-source
+        - - name: checkout-harness
+            template: checkout-peer-repo
+            when: "'{{workflow.parameters.repo-name}}' != 'harness-repo'"
+            arguments:
+              parameters:
+                - name: peer-repo
+                  value: harness-repo
+        - - name: checkout-business
+            template: checkout-peer-repo
+            when: "'{{workflow.parameters.repo-name}}' != 'business-repo'"
+            arguments:
+              parameters:
+                - name: peer-repo
+                  value: business-repo
+        - - name: checkout-idl
+            template: checkout-peer-repo
+            when: "'{{workflow.parameters.repo-name}}' != 'idl-repo'"
+            arguments:
+              parameters:
+                - name: peer-repo
+                  value: idl-repo
+        - - name: run-harness-gates
+            template: harness-gates
+            when: "'{{workflow.parameters.gate-kind}}' == 'harness-gates'"
+        - - name: run-delivery-readiness
+            template: delivery-readiness
+            when: "'{{workflow.parameters.gate-kind}}' == 'delivery-readiness'"
+        - - name: run-pr-metadata
+            template: pr-metadata
+            when: "'{{workflow.parameters.gate-kind}}' == 'pr-metadata'"
+        - - name: run-fides-ci
+            template: fides-ci
+            when: "'{{workflow.parameters.gate-kind}}' == 'fides-ci'"
+        - - name: run-fides-bff-ci
+            template: fides-bff-ci
+            when: "'{{workflow.parameters.gate-kind}}' == 'fides-bff-ci'"
+        - - name: run-contract-dependency-scan
+            template: contract-dependency-scan
+            when: "'{{workflow.parameters.gate-kind}}' == 'contract-dependency-scan'"
+        - - name: run-idl-contract-gate
+            template: idl-contract-gate
+            when: "'{{workflow.parameters.gate-kind}}' == 'idl-contract-gate'"
+        - - name: success
+            template: github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: success
+                - name: description
+                  value: Spark Argo gate passed
+
+    - name: checkout-source
+      container:
+        image: alpine/git:2.47.2
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            rm -rf /workspace/{{workflow.parameters.repo-name}}
+            git clone --filter=blob:none --no-checkout \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}.git" \
+              /workspace/{{workflow.parameters.repo-name}}
+            cd /workspace/{{workflow.parameters.repo-name}}
+            git fetch --depth 100 origin "{{workflow.parameters.commit-sha}}"
+            git fetch --depth 100 origin "{{workflow.parameters.base-ref}}"
+            git checkout --detach "{{workflow.parameters.commit-sha}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: checkout-peer-repo
+      inputs:
+        parameters:
+          - name: peer-repo
+      container:
+        image: alpine/git:2.47.2
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            repo="{{inputs.parameters.peer-repo}}"
+            rm -rf "/workspace/${repo}"
+            git clone --filter=blob:none --branch "{{workflow.parameters.head-ref}}" \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.repo-owner}}/${repo}.git" \
+              "/workspace/${repo}" \
+              || git clone --filter=blob:none --branch "{{workflow.parameters.base-ref}}" \
+                "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.repo-owner}}/${repo}.git" \
+                "/workspace/${repo}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: harness-gates
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace/harness-repo
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            janus version
+            jq empty .spark/hooks.json
+            bash -n scripts/install.sh
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if ! git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              base_ref="$(git rev-parse --verify --quiet HEAD~1 || git rev-parse HEAD)"
+            fi
+            git diff --name-only --diff-filter=d "${base_ref}" HEAD > /workspace/changed.txt || true
+            grep -E '^requirements/[^/]+/' /workspace/changed.txt \
+              | sed -E 's#^requirements/([^/]+)/.*#\1#' | sort -u > /workspace/req_ids.txt || true
+            grep -E '^requirements/[^/]+/gates/.+\.gate\.json$' /workspace/changed.txt \
+              > /workspace/gate_jsons.txt || true
+            while read -r gate_json; do
+              [ -z "${gate_json}" ] && continue
+              janus gate validate "${gate_json}"
+            done < /workspace/gate_jsons.txt
+            while read -r requirement_id; do
+              [ -z "${requirement_id}" ] && continue
+              janus requirement status "${requirement_id}"
+              if [ "{{workflow.parameters.base-ref}}" = "master" ]; then
+                janus requirement verify --requirement "${requirement_id}" --target merge
+              fi
+            done < /workspace/req_ids.txt
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: delivery-readiness
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: GH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: IDL_JAVA_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: IDL_GO_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: JANUS_GITHUB_OWNER
+            value: "{{workflow.parameters.repo-owner}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            requirement_id="$(printf '%s' "{{workflow.parameters.head-ref}}" | grep -Eo '[A-Z][A-Z0-9]*-[0-9]+' | tail -n 1 || true)"
+            if [ -z "${requirement_id}" ]; then
+              echo "No requirement id found in head ref; skipping delivery readiness."
+              exit 0
+            fi
+            janus delivery verify \
+              --workspace /workspace \
+              --requirement "${requirement_id}" \
+              --repo "{{workflow.parameters.repo-name}}" \
+              --base "{{workflow.parameters.base-ref}}" \
+              --head "{{workflow.parameters.head-ref}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: pr-metadata
+      container:
+        image: "{{workflow.parameters.python-image}}"
+        workingDir: /workspace/harness-repo
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-status-token
+                key: token
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            apt-get update
+            apt-get install -y --no-install-recommends curl jq
+            curl -fsS \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}/pulls/{{workflow.parameters.pr-number}}" \
+              > /workspace/pr.json
+            curl -fsS \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}/pulls/{{workflow.parameters.pr-number}}/commits?per_page=100" \
+              > /workspace/pr-commits.json
+            jq -r '.body // ""' /workspace/pr.json > /workspace/pr-body.md
+            python3 scripts/validate-pr-metadata.py \
+              --title "$(jq -r '.title' /workspace/pr.json)" \
+              --body-file /workspace/pr-body.md \
+              --commits-file /workspace/pr-commits.json
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: fides-ci
+      container:
+        image: "{{workflow.parameters.node-image}}"
+        workingDir: /workspace/business-repo
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(services/frontend/fides/|.github/workflows/fides-ci.yml)'; then
+                echo "No fides frontend changes; skipping."
+                exit 0
+              fi
+            fi
+            cd services/frontend/fides
+            corepack enable
+            corepack prepare pnpm@10 --activate
+            pnpm install --frozen-lockfile
+            pnpm lint:deps
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: fides-bff-ci
+      container:
+        image: "{{workflow.parameters.go-image}}"
+        workingDir: /workspace/business-repo
+        env:
+          - name: IDL_GO_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: GOPRIVATE
+            value: github.com/spark-harness/*
+          - name: GONOSUMDB
+            value: github.com/spark-harness/*
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(packages/bffkit/|services/backend/fides-bff/|.github/workflows/fides-bff-ci.yml)'; then
+                echo "No fides-bff or bffkit changes; skipping."
+                exit 0
+              fi
+            fi
+            git config --global url."https://x-access-token:${IDL_GO_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
+            cd services/backend/fides-bff
+            go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+            unformatted="$(gofmt -l .)"
+            test -z "${unformatted}" || { echo "${unformatted}"; exit 1; }
+            go vet ./...
+            go build ./...
+            go test ./... -count=1
+            golangci-lint run ./...
+            cd /workspace/business-repo/packages/bffkit
+            unformatted="$(gofmt -l .)"
+            test -z "${unformatted}" || { echo "${unformatted}"; exit 1; }
+            go vet ./...
+            go test ./... -count=1
+            golangci-lint run ./...
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: contract-dependency-scan
+      container:
+        image: "{{workflow.parameters.python-image}}"
+        workingDir: /workspace/business-repo
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            python3 -m unittest tests/test_contract_dependency_scan.py
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if ! git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              python3 scripts/contract_dependency_scan.py --mode rc-or-formal
+              exit 0
+            fi
+            mapfile -t changed_files < <(git diff --name-only "${base_ref}" HEAD)
+            args=()
+            for file in "${changed_files[@]}"; do
+              case "${file}" in
+                *pom.xml|*go.mod|*go.sum) args+=(--path "${file}") ;;
+              esac
+            done
+            if [ "${#args[@]}" -eq 0 ]; then
+              echo "No changed contract dependency declaration files; skipping scan."
+              exit 0
+            fi
+            python3 scripts/contract_dependency_scan.py --mode rc-or-formal "${args[@]}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: idl-contract-gate
+      container:
+        image: "{{workflow.parameters.buf-image}}"
+        workingDir: /workspace/idl-repo
+        command:
+          - sh
+          - -ceu
+        args:
+          - |
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '(\.proto$|^buf\.yaml$|^buf\.gen\.yaml$)'; then
+                echo "No IDL contract changes; skipping."
+                exit 0
+              fi
+            fi
+            buf lint
+            buf breaking --against ".git#branch={{workflow.parameters.base-ref}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: github-status
+      inputs:
+        parameters:
+          - name: state
+          - name: description
+      container:
+        image: curlimages/curl:8.10.1
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-status-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            curl -fsS -X POST \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}/statuses/{{workflow.parameters.commit-sha}}" \
+              -d "{\"state\":\"{{inputs.parameters.state}}\",\"context\":\"{{workflow.parameters.status-context}}\",\"description\":\"{{inputs.parameters.description}}\"}"
+
+    - name: report-failure
+      steps:
+        - - name: failure
+            template: github-status
+            when: "{{workflow.status}} != Succeeded"
+            arguments:
+              parameters:
+                - name: state
+                  value: failure
+                - name: description
+                  value: Spark Argo gate failed

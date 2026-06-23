@@ -2,5 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - github-image-release-workflow-template.yaml
+  - github-idl-release-workflow-template.yaml
   - github-pr-smoke-workflow-template.yaml
+  - github-repo-gate-workflow-template.yaml
   - smoke-workflow-template.yaml

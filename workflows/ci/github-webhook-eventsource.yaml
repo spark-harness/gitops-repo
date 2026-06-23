@@ -9,6 +9,15 @@ spec:
       - name: gitops-repo
         port: 12000
         targetPort: 12000
+      - name: harness-repo
+        port: 12001
+        targetPort: 12001
+      - name: business-repo
+        port: 12002
+        targetPort: 12002
+      - name: idl-repo
+        port: 12003
+        targetPort: 12003
   github:
     gitops-repo:
       repositories:
@@ -22,6 +31,70 @@ spec:
         url: https://github.fuzzytails.fun
       events:
         - pull_request
+      apiToken:
+        name: github-access
+        key: token
+      webhookSecret:
+        name: github-access
+        key: secret
+      insecure: false
+      active: true
+      contentType: json
+    harness-repo:
+      repositories:
+        - owner: spark-harness
+          names:
+            - harness-repo
+      webhook:
+        endpoint: /harness-repo
+        port: "12001"
+        method: POST
+        url: https://api.fuzzytails.fun
+      events:
+        - pull_request
+      apiToken:
+        name: github-access
+        key: token
+      webhookSecret:
+        name: github-access
+        key: secret
+      insecure: false
+      active: true
+      contentType: json
+    business-repo:
+      repositories:
+        - owner: spark-harness
+          names:
+            - business-repo
+      webhook:
+        endpoint: /business-repo
+        port: "12002"
+        method: POST
+        url: https://api.fuzzytails.fun
+      events:
+        - pull_request
+      apiToken:
+        name: github-access
+        key: token
+      webhookSecret:
+        name: github-access
+        key: secret
+      insecure: false
+      active: true
+      contentType: json
+    idl-repo:
+      repositories:
+        - owner: spark-harness
+          names:
+            - idl-repo
+      webhook:
+        endpoint: /idl-repo
+        port: "12003"
+        method: POST
+        url: https://api.fuzzytails.fun
+      events:
+        - pull_request
+        - push
       apiToken:
         name: github-access
         key: token
