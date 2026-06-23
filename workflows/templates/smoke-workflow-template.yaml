@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: spark-ci-smoke
+  namespace: argo
+spec:
+  entrypoint: smoke
+  serviceAccountName: argo
+  templates:
+    - name: smoke
+      container:
+        image: alpine:3.20
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            echo "spark ci smoke workflow"
+            echo "commit=${COMMIT_SHA:-manual}"
