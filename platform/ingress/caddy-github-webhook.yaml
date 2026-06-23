@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-config
+  namespace: caddy
+data:
+  Caddyfile: |
+    dog.ailuric.com {
+        reverse_proxy https://cat.ailuric.com {
+            header_up Host cat.ailuric.com
+        }
+    }
+
+    github.fuzzytails.fun {
+        reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12000
+    }
