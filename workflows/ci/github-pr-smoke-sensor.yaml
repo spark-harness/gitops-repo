@@ -1,0 +1,73 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: github-pr-smoke
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: github-sensor
+  dependencies:
+    - name: gitops-repo-pr
+      eventSourceName: github
+      eventName: gitops-repo
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+          - path: body.pull_request.state
+            type: string
+            value:
+              - open
+          - path: body.pull_request.base.ref
+            type: string
+            value:
+              - master
+  triggers:
+    - template:
+        name: pr-smoke-workflow
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: gitops-pr-smoke-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-pr-smoke
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+          parameters:
+            - src:
+                dependencyName: gitops-repo-pr
+                dataKey: body.repository.owner.login
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: gitops-repo-pr
+                dataKey: body.repository.name
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: gitops-repo-pr
+                dataKey: body.pull_request.head.sha
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: gitops-repo-pr
+                dataKey: body.pull_request.number
+              dest: spec.arguments.parameters.3.value

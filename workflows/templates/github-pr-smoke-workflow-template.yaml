@@ -1,0 +1,79 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: github-pr-smoke
+  namespace: argo
+spec:
+  entrypoint: run
+  serviceAccountName: argo
+  arguments:
+    parameters:
+      - name: repo-owner
+      - name: repo-name
+      - name: commit-sha
+      - name: pr-number
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: repo-owner
+          - name: repo-name
+          - name: commit-sha
+          - name: pr-number
+      steps:
+        - - name: pending
+            template: github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: pending
+                - name: description
+                  value: Argo smoke workflow started
+        - - name: smoke
+            template: smoke
+        - - name: success
+            template: github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: success
+                - name: description
+                  value: Argo smoke workflow succeeded
+
+    - name: smoke
+      container:
+        image: alpine:3.20
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            echo "spark gitops pr smoke"
+            echo "repo={{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}"
+            echo "pr={{workflow.parameters.pr-number}}"
+            echo "sha={{workflow.parameters.commit-sha}}"
+
+    - name: github-status
+      inputs:
+        parameters:
+          - name: state
+          - name: description
+      container:
+        image: curlimages/curl:8.10.1
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-status-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            curl -fsS -X POST \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}/statuses/{{workflow.parameters.commit-sha}}" \
+              -d "{\"state\":\"{{inputs.parameters.state}}\",\"context\":\"spark/argo-smoke\",\"description\":\"{{inputs.parameters.description}}\"}"

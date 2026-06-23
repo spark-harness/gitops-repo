@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github
+  namespace: argo-events
+spec:
+  service:
+    ports:
+      - name: gitops-repo
+        port: 12000
+        targetPort: 12000
+  github:
+    gitops-repo:
+      repositories:
+        - owner: spark-harness
+          names:
+            - gitops-repo
+      webhook:
+        endpoint: /gitops-repo
+        port: "12000"
+        method: POST
+        url: https://github.fuzzytails.fun
+      events:
+        - pull_request
+      apiToken:
+        name: github-access
+        key: token
+      webhookSecret:
+        name: github-access
+        key: secret
+      insecure: false
+      active: true
+      contentType: json
