@@ -14,3 +14,15 @@ data:
     github.fuzzytails.fun {
         reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12000
     }
+
+    api.fuzzytails.fun {
+        handle /harness-repo {
+            reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12001
+        }
+        handle /business-repo {
+            reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12002
+        }
+        handle /idl-repo {
+            reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12003
+        }
+    }
