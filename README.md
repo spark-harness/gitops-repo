@@ -65,6 +65,13 @@ workflows/
 - PR 触发 gate workflow，并通过 GitHub required check 控制合并。
 - merge 后 release workflow 构建或复用已验证镜像，并更新本仓库中的 image tag 或 digest。
 
+镜像发布策略：
+
+- PR 镜像使用临时 tag，只用于扫描和门禁，不作为环境部署输入。
+- 主干发布镜像必须能追溯到 commit SHA。
+- 环境 overlay 只接受不可变 digest。
+- 业务仓负责 Dockerfile 和测试，本仓库负责 Argo Workflow 模板、Secret 引用和 GitOps digest promotion。
+
 ## 安全规则
 
 - 不提交真实密钥、token、kubeconfig 或 registry 密码。

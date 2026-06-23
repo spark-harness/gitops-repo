@@ -5,7 +5,7 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/spark-harness/applicant-api
-    newTag: prod-placeholder
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 replicas:
   - name: applicant-api
     count: 2

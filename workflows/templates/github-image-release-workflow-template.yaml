@@ -1,0 +1,267 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: github-image-release
+  namespace: argo
+spec:
+  entrypoint: run
+  serviceAccountName: argo
+  onExit: report-failure
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+  volumes:
+    - name: registry-dockerconfig
+      secret:
+        secretName: registry-dockerconfig
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+  arguments:
+    parameters:
+      - name: repo-owner
+      - name: repo-name
+      - name: commit-sha
+      - name: pr-number
+        value: ""
+      - name: source-ref
+        value: master
+      - name: image-repository
+      - name: build-context
+        value: "."
+      - name: dockerfile-dir
+        value: "."
+      - name: dockerfile-name
+        value: Dockerfile
+      - name: gitops-repo
+        value: spark-harness/gitops-repo
+      - name: gitops-branch
+        value: master
+      - name: gitops-overlay-path
+        value: ""
+      - name: gitops-image-name
+        value: ""
+      - name: promote
+        value: "false"
+      - name: status-context
+        value: spark/image-release
+  templates:
+    - name: run
+      steps:
+        - - name: pending
+            template: github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: pending
+                - name: description
+                  value: Spark image release workflow started
+        - - name: checkout
+            template: checkout-source
+        - - name: build
+            template: build-image
+        - - name: scan
+            template: scan-image
+        - - name: promote
+            template: promote-gitops-digest
+            when: "{{workflow.parameters.promote}} == true"
+        - - name: success
+            template: github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: success
+                - name: description
+                  value: Spark image build, scan, and release checks passed
+
+    - name: checkout-source
+      container:
+        image: alpine/git:2.47.2
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            rm -rf /workspace/source
+            git clone --depth 1 --branch "{{workflow.parameters.source-ref}}" \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}.git" \
+              /workspace/source
+            cd /workspace/source
+            git fetch --depth 1 origin "{{workflow.parameters.commit-sha}}"
+            git checkout --detach "{{workflow.parameters.commit-sha}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: build-image
+      container:
+        image: moby/buildkit:rootless
+        workingDir: /workspace/source
+        env:
+          - name: BUILDKITD_FLAGS
+            value: --oci-worker-no-process-sandbox
+          - name: DOCKER_CONFIG
+            value: /workspace/docker
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            short_sha="$(printf '%s' "{{workflow.parameters.commit-sha}}" | cut -c1-12)"
+            if [ -n "{{workflow.parameters.pr-number}}" ]; then
+              image_ref="{{workflow.parameters.image-repository}}:pr-{{workflow.parameters.pr-number}}-${short_sha}"
+            else
+              image_ref="{{workflow.parameters.image-repository}}:sha-${short_sha}"
+            fi
+            mkdir -p /workspace/image
+            buildctl-daemonless.sh build \
+              --frontend dockerfile.v0 \
+              --local context="/workspace/source/{{workflow.parameters.build-context}}" \
+              --local dockerfile="/workspace/source/{{workflow.parameters.dockerfile-dir}}" \
+              --opt filename="{{workflow.parameters.dockerfile-name}}" \
+              --opt "label:org.opencontainers.image.revision={{workflow.parameters.commit-sha}}" \
+              --metadata-file /workspace/image/metadata.json \
+              --output "type=image,name=${image_ref},push=true"
+            digest="$(sed -n 's/.*"containerimage.digest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /workspace/image/metadata.json | head -n1)"
+            test -n "${digest}"
+            printf '%s' "${image_ref}" > /workspace/image/ref
+            printf '%s' "${digest}" > /workspace/image/digest
+            printf '%s@%s' "{{workflow.parameters.image-repository}}" "${digest}" > /workspace/image/immutable-ref
+        securityContext:
+          privileged: true
+          runAsGroup: 1000
+          runAsUser: 1000
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: registry-dockerconfig
+            mountPath: /workspace/docker
+            readOnly: true
+
+    - name: scan-image
+      container:
+        image: aquasec/trivy:0.58.2
+        env:
+          - name: DOCKER_CONFIG
+            value: /workspace/docker
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            image_ref="$(cat /workspace/image/immutable-ref)"
+            trivy image \
+              --exit-code 1 \
+              --severity HIGH,CRITICAL \
+              --ignore-unfixed \
+              --format table \
+              "${image_ref}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: registry-dockerconfig
+            mountPath: /workspace/docker
+            readOnly: true
+
+    - name: promote-gitops-digest
+      container:
+        image: alpine/git:2.47.2
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-gitops-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eu
+            test -n "{{workflow.parameters.gitops-overlay-path}}"
+            test -n "{{workflow.parameters.gitops-image-name}}"
+            digest="$(cat /workspace/image/digest)"
+            rm -rf /workspace/gitops
+            git clone --depth 1 --branch "{{workflow.parameters.gitops-branch}}" \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.gitops-repo}}.git" \
+              /workspace/gitops
+            file="/workspace/gitops/{{workflow.parameters.gitops-overlay-path}}/kustomization.yaml"
+            test -f "${file}"
+            awk -v image="{{workflow.parameters.gitops-image-name}}" -v digest="${digest}" '
+              index($0, "name: " image) > 0 {
+                print
+                if (getline > 0) {
+                  if ($0 ~ /^[[:space:]]*(newTag|digest):/) {
+                    print "    digest: " digest
+                    next
+                  }
+                  print "    digest: " digest
+                  print
+                  next
+                }
+              }
+              { print }
+            ' "${file}" > "${file}.tmp"
+            mv "${file}.tmp" "${file}"
+            cd /workspace/gitops
+            git config user.name "spark-argo"
+            git config user.email "spark-argo@users.noreply.github.com"
+            git add "${file}"
+            git diff --staged --quiet && exit 0
+            git commit -m "chore(gitops): promote {{workflow.parameters.repo-name}} image {{workflow.parameters.commit-sha}}"
+            git push origin HEAD:"{{workflow.parameters.gitops-branch}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: github-status
+      inputs:
+        parameters:
+          - name: state
+          - name: description
+      container:
+        image: curlimages/curl:8.10.1
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-status-token
+                key: token
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            curl -fsS -X POST \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}/statuses/{{workflow.parameters.commit-sha}}" \
+              -d "{\"state\":\"{{inputs.parameters.state}}\",\"context\":\"{{workflow.parameters.status-context}}\",\"description\":\"{{inputs.parameters.description}}\"}"
+
+    - name: report-failure
+      steps:
+        - - name: failure
+            template: github-status
+            when: "{{workflow.status}} != Succeeded"
+            arguments:
+              parameters:
+                - name: state
+                  value: failure
+                - name: description
+                  value: Spark image release workflow failed
