@@ -31,11 +31,12 @@ workflows/
 
 ## 环境入口
 
-- `clusters/sta1/`：STA1 集群入口，保存 STA1 namespace 和 Argo CD Application 清单。
-- `clusters/sta2/`：STA2 集群入口，保存 STA2 namespace 和 Argo CD Application 清单。
-- `clusters/prod/`：生产集群入口，保存生产 namespace 和 Argo CD Application 清单。
+- `clusters/sta1/`：STA1 集群入口，保存 STA1 namespace、AppProject 和 Argo CD Application 清单。
+- `clusters/sta2/`：STA2 集群入口，保存 STA2 namespace、AppProject 和 Argo CD Application 清单。
+- `clusters/prod/`：生产集群入口，保存生产 namespace、AppProject 和 Argo CD Application 清单。
 
 每个环境目录只描述该环境要同步什么，不保存其他环境的默认值。
+每个环境目录必须能通过 `kubectl kustomize clusters/<env>` 独立渲染。
 
 ## 平台组件
 
