@@ -32,6 +32,8 @@ spec:
         value: maven:3.9.9-eclipse-temurin-17
       - name: openapi-generator-image
         value: openapitools/openapi-generator-cli:v7.14.0
+      - name: node-image
+        value: node:24-bookworm
       - name: go-idl-repository
         value: spark-harness/idl-go-repo
       - name: java-idl-repository
@@ -224,7 +226,7 @@ spec:
 
     - name: sync-ts
       container:
-        image: "{{workflow.parameters.janus-image}}"
+        image: "{{workflow.parameters.node-image}}"
         workingDir: /workspace
         env:
           - name: BRANCH_NAME
@@ -247,6 +249,7 @@ spec:
             else
               branch_exists=false
             fi
+            corepack enable
             pnpm install --frozen-lockfile
             pnpm build
             git config user.name "spark-argo"
