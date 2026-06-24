@@ -110,6 +110,11 @@ spec:
             value: "{{workflow.parameters.openapi-idl-repository}}"
           - name: IDL_COMMIT
             value: "{{workflow.parameters.commit-sha}}"
+          - name: BUF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: buf-token
+                key: token
         command:
           - bash
           - -ceu
@@ -275,6 +280,11 @@ spec:
             value: "{{workflow.parameters.go-idl-repository}}"
           - name: IDL_COMMIT
             value: "{{workflow.parameters.commit-sha}}"
+          - name: BUF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: buf-token
+                key: token
         command:
           - bash
           - -ceu
@@ -334,6 +344,11 @@ spec:
             value: "{{workflow.parameters.java-idl-repository}}"
           - name: IDL_COMMIT
             value: "{{workflow.parameters.commit-sha}}"
+          - name: BUF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: buf-token
+                key: token
         command:
           - bash
           - -ceu
@@ -392,6 +407,11 @@ spec:
             value: "{{workflow.parameters.go-idl-repository}}"
           - name: GO_BASE_BRANCH
             value: "{{workflow.parameters.go-base-branch}}"
+          - name: BUF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: buf-token
+                key: token
         command:
           - bash
           - -ceu
@@ -474,6 +494,11 @@ spec:
             value: "{{workflow.parameters.maven-package-name}}"
           - name: GITHUB_REPOSITORY_OWNER
             value: "{{workflow.parameters.repo-owner}}"
+          - name: BUF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: buf-token
+                key: token
         command:
           - bash
           - -ceu
