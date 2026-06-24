@@ -55,16 +55,16 @@ spec:
             template: checkout-idl
         - - name: sync-openapi
             template: sync-openapi
+          - name: sync-go
+            template: sync-go
+          - name: sync-java
+            template: sync-java
         - - name: checkout-ts-inputs
             template: checkout-ts-inputs
         - - name: generate-ts
             template: generate-ts
         - - name: sync-ts
             template: sync-ts
-        - - name: sync-go
-            template: sync-go
-        - - name: sync-java
-            template: sync-java
         - - name: publish-go
             template: publish-go
         - - name: publish-java
