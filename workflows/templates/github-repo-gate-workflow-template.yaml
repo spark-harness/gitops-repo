@@ -284,6 +284,12 @@ spec:
       container:
         image: "{{workflow.parameters.node-image}}"
         workingDir: /workspace/business-repo
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
         command:
           - bash
           - -ceu
@@ -297,6 +303,13 @@ spec:
               fi
             fi
             cd services/frontend/fides
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+            export GIT_CONFIG_COUNT=2
+            export GIT_CONFIG_KEY_0="url.https://x-access-token:${GITHUB_TOKEN}@github.com/.insteadOf"
+            export GIT_CONFIG_VALUE_0="git@github.com:"
+            export GIT_CONFIG_KEY_1="url.https://x-access-token:${GITHUB_TOKEN}@github.com/.insteadOf"
+            export GIT_CONFIG_VALUE_1="ssh://git@github.com/"
             corepack enable
             corepack prepare pnpm@10 --activate
             pnpm install --frozen-lockfile
@@ -385,6 +398,12 @@ spec:
       container:
         image: "{{workflow.parameters.buf-image}}"
         workingDir: /workspace/idl-repo
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
         command:
           - sh
           - -ceu
@@ -398,7 +417,8 @@ spec:
               fi
             fi
             buf lint
-            buf breaking --against ".git#branch={{workflow.parameters.base-ref}}"
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+            buf breaking --against "https://github.com/{{workflow.parameters.repo-owner}}/{{workflow.parameters.repo-name}}.git#branch={{workflow.parameters.base-ref}}"
         volumeMounts:
           - name: workspace
             mountPath: /workspace
