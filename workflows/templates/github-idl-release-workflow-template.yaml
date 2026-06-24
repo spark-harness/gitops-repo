@@ -53,22 +53,37 @@ spec:
       steps:
         - - name: checkout-idl
             template: checkout-idl
+        - - name: go-chain
+            template: go-chain
+          - name: java-chain
+            template: java-chain
+          - name: openapi-ts-chain
+            template: openapi-ts-chain
+
+    - name: go-chain
+      steps:
+        - - name: sync-go
+            template: sync-go
+        - - name: publish-go
+            template: publish-go
+
+    - name: java-chain
+      steps:
+        - - name: sync-java
+            template: sync-java
+        - - name: publish-java
+            template: publish-java
+
+    - name: openapi-ts-chain
+      steps:
         - - name: sync-openapi
             template: sync-openapi
-          - name: sync-go
-            template: sync-go
-          - name: sync-java
-            template: sync-java
         - - name: checkout-ts-inputs
             template: checkout-ts-inputs
         - - name: generate-ts
             template: generate-ts
         - - name: sync-ts
             template: sync-ts
-        - - name: publish-go
-            template: publish-go
-        - - name: publish-java
-            template: publish-java
 
     - name: checkout-idl
       container:
