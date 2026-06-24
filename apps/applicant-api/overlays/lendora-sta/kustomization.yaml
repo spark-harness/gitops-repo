@@ -5,7 +5,7 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/spark-harness/applicant-api
-    digest: sha256:769a1a1c67b554d061f460936e19c7beb9caaecd2b474e839a30d1b25eb39178
+    digest: sha256:70b3a3f5c0179b11a8171e7bbdb254020f29e6c1471a93a70827776c50504ff3
 replicas:
   - name: applicant-api
     count: 1
