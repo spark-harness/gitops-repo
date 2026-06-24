@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-sta-fides-bff
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/spark-harness/fides-bff
+    digest: sha256:b95914c46980c0c1e3ee433f0230c2322e6a764f43c6c54a9ff37b890811ee45
+replicas:
+  - name: fides-bff
+    count: 1
+labels:
+  - pairs:
+      lendora.io/environment: sta

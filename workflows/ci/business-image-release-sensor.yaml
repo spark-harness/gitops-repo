@@ -1,0 +1,164 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: business-image-release
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: github-sensor
+  dependencies:
+    - name: business-repo-master-push
+      eventSourceName: github
+      eventName: business-repo
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value:
+              - push
+          - path: body.ref
+            type: string
+            value:
+              - refs/heads/master
+  triggers:
+    - template:
+        name: applicant-api-image
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-applicant-api-image-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-image-release
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                      value: spark-harness
+                    - name: repo-name
+                      value: business-repo
+                    - name: commit-sha
+                    - name: source-ref
+                      value: master
+                    - name: image-repository
+                      value: ghcr.io/spark-harness/applicant-api
+                    - name: build-context
+                      value: "."
+                    - name: dockerfile-dir
+                      value: services/backend/applicant-api
+                    - name: dockerfile-name
+                      value: Dockerfile
+                    - name: gitops-overlay-path
+                      value: apps/applicant-api/overlays/lendora-sta
+                    - name: gitops-image-name
+                      value: ghcr.io/spark-harness/applicant-api
+                    - name: promote
+                      value: "true"
+                    - name: status-context
+                      value: spark/applicant-api-image
+          parameters:
+            - src:
+                dependencyName: business-repo-master-push
+                dataKey: body.after
+              dest: spec.arguments.parameters.2.value
+    - template:
+        name: fides-bff-image
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-fides-bff-image-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-image-release
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                      value: spark-harness
+                    - name: repo-name
+                      value: business-repo
+                    - name: commit-sha
+                    - name: source-ref
+                      value: master
+                    - name: image-repository
+                      value: ghcr.io/spark-harness/fides-bff
+                    - name: build-context
+                      value: "."
+                    - name: dockerfile-dir
+                      value: services/backend/fides-bff
+                    - name: dockerfile-name
+                      value: Dockerfile
+                    - name: gitops-overlay-path
+                      value: apps/fides-bff/overlays/lendora-sta
+                    - name: gitops-image-name
+                      value: ghcr.io/spark-harness/fides-bff
+                    - name: promote
+                      value: "true"
+                    - name: status-context
+                      value: spark/fides-bff-image
+          parameters:
+            - src:
+                dependencyName: business-repo-master-push
+                dataKey: body.after
+              dest: spec.arguments.parameters.2.value
+    - template:
+        name: fides-image
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-fides-image-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-image-release
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                      value: spark-harness
+                    - name: repo-name
+                      value: business-repo
+                    - name: commit-sha
+                    - name: source-ref
+                      value: master
+                    - name: image-repository
+                      value: ghcr.io/spark-harness/fides
+                    - name: build-context
+                      value: "."
+                    - name: dockerfile-dir
+                      value: services/frontend/fides
+                    - name: dockerfile-name
+                      value: Dockerfile
+                    - name: gitops-overlay-path
+                      value: apps/fides/overlays/lendora-sta
+                    - name: gitops-image-name
+                      value: ghcr.io/spark-harness/fides
+                    - name: promote
+                      value: "true"
+                    - name: status-context
+                      value: spark/fides-image
+          parameters:
+            - src:
+                dependencyName: business-repo-master-push
+                dataKey: body.after
+              dest: spec.arguments.parameters.2.value

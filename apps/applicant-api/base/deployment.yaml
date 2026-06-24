@@ -4,7 +4,7 @@ metadata:
   name: applicant-api
   labels:
     app.kubernetes.io/name: applicant-api
-    app.kubernetes.io/part-of: spark
+    app.kubernetes.io/part-of: lendora
 spec:
   replicas: 1
   selector:
@@ -14,19 +14,55 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: applicant-api
-        app.kubernetes.io/part-of: spark
+        app.kubernetes.io/part-of: lendora
     spec:
+      serviceAccountName: applicant-api
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: applicant-api
           image: ghcr.io/spark-harness/applicant-api:replace-me
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8080
+            - name: grpc
+              containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: applicant-api-config
+          env:
+            - name: APPLICANT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: applicant-api-runtime
+                  key: db-password
+            - name: APPLICANT_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: applicant-api-runtime
+                  key: redis-password
+            - name: APPLICANT_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: applicant-api-runtime
+                  key: token-secret
           readinessProbe:
             httpGet:
-              path: /actuator/health/readiness
+              path: /ready
               port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health/liveness
+              path: /health
               port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi

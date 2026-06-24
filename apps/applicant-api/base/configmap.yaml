@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: applicant-api-config
+  labels:
+    app.kubernetes.io/name: applicant-api
+    app.kubernetes.io/part-of: lendora
+data:
+  SPRING_PROFILES_ACTIVE: sta
+  SERVER_PORT: "8080"
+  APPLICANT_GRPC_PORT: "9090"
+  APPLICANT_DB_URL: jdbc:postgresql://postgres.lendora-sta-postgres.svc.cluster.local:5432/applicant
+  APPLICANT_DB_USERNAME: applicant
+  APPLICANT_MIGRATIONS_ENABLED: "false"
+  APPLICANT_REDIS_HOST: redis.lendora-sta-redis.svc.cluster.local
+  APPLICANT_REDIS_PORT: "6379"
+  APPLICANT_CONSUL_ENABLED: "true"
+  APPLICANT_CONSUL_URL: http://consul.lendora-sta-consul.svc.cluster.local:8500
+  APPLICANT_SERVICE_ADDRESS: applicant-api.lendora-sta-applicant-api.svc.cluster.local
+  APPLICANT_CONSUL_HEALTH_CHECK_URL: http://applicant-api.lendora-sta-applicant-api.svc.cluster.local:80/ready
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector.lendora-sta-observability.svc.cluster.local:4318/v1/traces
+  OTEL_EXPORTER_OTLP_TRACES_HEADERS: x-lendora-environment=sta

@@ -31,6 +31,7 @@ spec:
         url: https://github.fuzzytails.fun
       events:
         - pull_request
+        - push
       apiToken:
         name: github-access
         key: token

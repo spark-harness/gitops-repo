@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lendora-sta-dependencies
+  namespace: argocd
+spec:
+  project: lendora-sta
+  source:
+    repoURL: https://github.com/spark-harness/gitops-repo.git
+    targetRevision: master
+    path: apps/lendora-sta-dependencies/overlays/sta
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lendora-sta-postgres
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

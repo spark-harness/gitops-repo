@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fides-bff
+  labels:
+    app.kubernetes.io/name: fides-bff
+    app.kubernetes.io/part-of: lendora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fides-bff
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fides-bff
+        app.kubernetes.io/part-of: lendora
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: fides-bff
+          image: ghcr.io/spark-harness/fides-bff:replace-me
+          imagePullPolicy: IfNotPresent
+          args:
+            - -conf
+            - /app/configs/config.yaml
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs/config.yaml
+              subPath: config.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: fides-bff-config

@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lendora-sta-fides
+  namespace: argocd
+spec:
+  project: lendora-sta
+  source:
+    repoURL: https://github.com/spark-harness/gitops-repo.git
+    targetRevision: master
+    path: apps/fides/overlays/lendora-sta
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lendora-sta-fides
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

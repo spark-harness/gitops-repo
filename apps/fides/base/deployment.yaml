@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fides
+  labels:
+    app.kubernetes.io/name: fides
+    app.kubernetes.io/part-of: lendora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fides
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fides
+        app.kubernetes.io/part-of: lendora
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: fides
+          image: ghcr.io/spark-harness/fides:replace-me
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_FIDES_OTP_ADAPTER
+              value: real
+            - name: NEXT_PUBLIC_FIDES_BFF_BASE_URL
+              value: /api/v1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

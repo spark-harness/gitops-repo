@@ -77,6 +77,13 @@ spec:
               parameters:
                 - name: peer-repo
                   value: idl-repo
+        - - name: checkout-gitops
+            template: checkout-peer-repo
+            when: "'{{workflow.parameters.repo-name}}' != 'gitops-repo'"
+            arguments:
+              parameters:
+                - name: peer-repo
+                  value: gitops-repo
         - - name: run-harness-gates
             template: harness-gates
             when: "'{{workflow.parameters.gate-kind}}' == 'harness-gates'"

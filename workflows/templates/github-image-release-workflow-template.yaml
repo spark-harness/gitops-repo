@@ -115,6 +115,11 @@ spec:
             value: --oci-worker-no-process-sandbox
           - name: DOCKER_CONFIG
             value: /workspace/docker
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
         command:
           - sh
           - -c
@@ -134,6 +139,7 @@ spec:
               --local dockerfile="/workspace/source/{{workflow.parameters.dockerfile-dir}}" \
               --opt filename="{{workflow.parameters.dockerfile-name}}" \
               --opt "label:org.opencontainers.image.revision={{workflow.parameters.commit-sha}}" \
+              --secret id=github_token,env=GITHUB_TOKEN \
               --metadata-file /workspace/image/metadata.json \
               --output "type=image,name=${image_ref},push=true"
             digest="$(sed -n 's/.*"containerimage.digest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /workspace/image/metadata.json | head -n1)"
