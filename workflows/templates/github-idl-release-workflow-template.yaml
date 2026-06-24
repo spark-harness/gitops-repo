@@ -30,10 +30,16 @@ spec:
         value: golang:1.26-bookworm
       - name: maven-image
         value: maven:3.9.9-eclipse-temurin-17
+      - name: openapi-generator-image
+        value: openapitools/openapi-generator-cli:v7.14.0
       - name: go-idl-repository
         value: spark-harness/idl-go-repo
       - name: java-idl-repository
         value: spark-harness/idl-java-repo
+      - name: openapi-idl-repository
+        value: spark-harness/idl-openapi-repo
+      - name: ts-idl-repository
+        value: spark-harness/idl-ts-repo
       - name: go-base-branch
         value: master
       - name: java-base-branch
@@ -45,6 +51,14 @@ spec:
       steps:
         - - name: checkout-idl
             template: checkout-idl
+        - - name: sync-openapi
+            template: sync-openapi
+        - - name: checkout-ts-inputs
+            template: checkout-ts-inputs
+        - - name: generate-ts
+            template: generate-ts
+        - - name: sync-ts
+            template: sync-ts
         - - name: sync-go
             template: sync-go
         - - name: sync-java
@@ -76,6 +90,171 @@ spec:
             cd /workspace/idl-repo
             git fetch --depth 100 origin "{{workflow.parameters.commit-sha}}"
             git checkout --detach "{{workflow.parameters.commit-sha}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: sync-openapi
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: OPENAPI_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: BRANCH_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: OPENAPI_IDL_REPOSITORY
+            value: "{{workflow.parameters.openapi-idl-repository}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${BRANCH_NAME}" != refs/heads/* ]]; then
+              echo "Not a branch push; skipping OpenAPI sync for ${BRANCH_NAME}."
+              exit 0
+            fi
+            BRANCH_NAME="${BRANCH_NAME#refs/heads/}"
+            test -n "${OPENAPI_REPO_TOKEN}"
+            git clone --filter=blob:none "https://x-access-token:${OPENAPI_REPO_TOKEN}@github.com/${OPENAPI_IDL_REPOSITORY}.git" idl-openapi-repo
+            cd idl-openapi-repo
+            if git ls-remote --exit-code --heads origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+              git fetch --depth 100 origin "${BRANCH_NAME}"
+              git checkout -B "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
+              branch_exists=true
+            else
+              git checkout -B "${BRANCH_NAME}"
+              branch_exists=false
+            fi
+            cd /workspace/idl-repo
+            buf generate --template buf.gen.openapi.yaml --path vesta/lendora/fides-bff/v1/auth.proto
+            install -d /workspace/idl-openapi-repo/vesta/lendora/fides-bff/v1
+            cp /workspace/.generated/openapi/openapi.yaml /workspace/idl-openapi-repo/vesta/lendora/fides-bff/v1/openapi.yaml
+            cd /workspace/idl-openapi-repo
+            git config user.name "spark-argo"
+            git config user.email "spark-argo@users.noreply.github.com"
+            git add -A
+            if git diff --cached --quiet; then
+              if [ "${branch_exists}" != "true" ]; then
+                git push origin "HEAD:${BRANCH_NAME}"
+              fi
+              exit 0
+            fi
+            git commit -m "chore(openapi): sync generated contracts from ${IDL_COMMIT:0:12}"
+            git push origin "HEAD:${BRANCH_NAME}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: checkout-ts-inputs
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+          - name: BRANCH_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: OPENAPI_IDL_REPOSITORY
+            value: "{{workflow.parameters.openapi-idl-repository}}"
+          - name: TS_IDL_REPOSITORY
+            value: "{{workflow.parameters.ts-idl-repository}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${BRANCH_NAME}" != refs/heads/* ]]; then
+              echo "Not a branch push; skipping TS sync for ${BRANCH_NAME}."
+              exit 0
+            fi
+            BRANCH_NAME="${BRANCH_NAME#refs/heads/}"
+            test -n "${GITHUB_TOKEN}"
+            rm -rf idl-openapi-repo idl-ts-repo
+            git clone --filter=blob:none --branch "${BRANCH_NAME}" \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${OPENAPI_IDL_REPOSITORY}.git" \
+              idl-openapi-repo
+            git clone --filter=blob:none "https://x-access-token:${GITHUB_TOKEN}@github.com/${TS_IDL_REPOSITORY}.git" idl-ts-repo
+            cd idl-ts-repo
+            if git ls-remote --exit-code --heads origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+              git fetch --depth 100 origin "${BRANCH_NAME}"
+              git checkout -B "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
+              branch_exists=true
+            else
+              git checkout -B "${BRANCH_NAME}"
+              branch_exists=false
+            fi
+            rm -rf src dist
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: generate-ts
+      container:
+        image: "{{workflow.parameters.openapi-generator-image}}"
+        workingDir: /workspace
+        args:
+          - generate
+          - -g
+          - typescript-fetch
+          - -i
+          - /workspace/idl-openapi-repo/vesta/lendora/fides-bff/v1/openapi.yaml
+          - -o
+          - /workspace/idl-ts-repo/src/vesta/lendora/fides-bff/v1
+          - --additional-properties=supportsES6=true,withInterfaces=true,useSingleRequestParameter=true,importFileExtension=.js
+          - --global-property=apiTests=false,modelTests=false,apiDocs=false,modelDocs=false
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: sync-ts
+      container:
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace
+        env:
+          - name: BRANCH_NAME
+            value: "{{workflow.parameters.ref}}"
+          - name: IDL_COMMIT
+            value: "{{workflow.parameters.commit-sha}}"
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            if [[ "${BRANCH_NAME}" != refs/heads/* ]]; then
+              echo "Not a branch push; skipping TS sync for ${BRANCH_NAME}."
+              exit 0
+            fi
+            BRANCH_NAME="${BRANCH_NAME#refs/heads/}"
+            cd /workspace/idl-ts-repo
+            if git ls-remote --exit-code --heads origin "${BRANCH_NAME}" >/dev/null 2>&1; then
+              branch_exists=true
+            else
+              branch_exists=false
+            fi
+            pnpm install --frozen-lockfile
+            pnpm build
+            git config user.name "spark-argo"
+            git config user.email "spark-argo@users.noreply.github.com"
+            git add -A
+            if git diff --cached --quiet; then
+              if [ "${branch_exists}" != "true" ]; then
+                git push origin "HEAD:${BRANCH_NAME}"
+              fi
+              exit 0
+            fi
+            git commit -m "chore(ts): sync generated client from ${IDL_COMMIT:0:12}"
+            git push origin "HEAD:${BRANCH_NAME}"
         volumeMounts:
           - name: workspace
             mountPath: /workspace
@@ -177,7 +356,7 @@ spec:
               branch_exists=false
             fi
             cd /workspace/idl-repo
-            buf generate
+            buf generate --template buf.gen.java.yaml
             cd /workspace/idl-java-repo
             mvn -B test
             git config user.name "spark-argo"
@@ -332,7 +511,7 @@ spec:
             fi
             git clone --filter=blob:none --branch "${JAVA_BASE_BRANCH}" "https://x-access-token:${IDL_JAVA_REPO_TOKEN}@github.com/${JAVA_IDL_REPOSITORY}.git" idl-java-repo
             cd /workspace/idl-repo
-            buf generate
+            buf generate --template buf.gen.java.yaml
             cd /workspace/idl-java-repo
             export JAVA_VERSION="${java_version}"
             prepare_maven_version.py
