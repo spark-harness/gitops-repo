@@ -4,11 +4,15 @@ metadata:
   name: applicant-api
   labels:
     app.kubernetes.io/name: applicant-api
-    app.kubernetes.io/part-of: spark
+    app.kubernetes.io/part-of: lendora
 spec:
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: applicant-api
   ports:
     - name: http
       port: 80
       targetPort: http
+    - name: grpc
+      port: 9090
+      targetPort: grpc

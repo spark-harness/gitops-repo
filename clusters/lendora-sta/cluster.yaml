@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lendora-sta-cluster
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: lendora-sta
+    app.kubernetes.io/part-of: lendora
+data:
+  environment: sta
+  brand: Lendora
+  runtimeOwner: LEN-77
