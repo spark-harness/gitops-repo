@@ -5,7 +5,7 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/spark-harness/fides-bff
-    digest: sha256:4c13dcc0c3d23d88e0e32c1c4eaa9c6e957bdfd81e47dc42b23d8ff2717c27e1
+    digest: sha256:e511dfff7ced08528b42dee402097c74189e1bb102daa28a73475f2115a884bb
 replicas:
   - name: fides-bff
     count: 1
