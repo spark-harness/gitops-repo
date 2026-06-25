@@ -52,7 +52,7 @@ Argo image release workflow 参数示例：
 repo-owner=spark-harness
 repo-name=business-repo
 build-context=.
-dockerfile-dir=services/<path-to-service>
+dockerfile-dir=apps/<service>
 dockerfile-name=Dockerfile
 gitops-overlay-path=apps/<service>/overlays/lendora-sta
 gitops-image-name=ghcr.io/spark-harness/<service>
@@ -61,9 +61,9 @@ promote=true
 
 | Service | dockerfile-dir |
 |---|---|
-| applicant-api | `services/backend/applicant-api` |
-| fides-bff | `services/backend/fides-bff` |
-| fides | `services/frontend/fides` |
+| applicant-api | `apps/applicant-api` |
+| fides-bff | `apps/fides-bff` |
+| fides | `apps/fides-web` |
 
 ## Verification
 

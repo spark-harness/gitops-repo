@@ -52,7 +52,7 @@ spec:
                     - name: build-context
                       value: "."
                     - name: dockerfile-dir
-                      value: services/backend/applicant-api
+                      value: apps/applicant-api
                     - name: dockerfile-name
                       value: Dockerfile
                     - name: gitops-overlay-path
@@ -99,7 +99,7 @@ spec:
                     - name: build-context
                       value: "."
                     - name: dockerfile-dir
-                      value: services/backend/fides-bff
+                      value: apps/fides-bff
                     - name: dockerfile-name
                       value: Dockerfile
                     - name: gitops-overlay-path
@@ -146,7 +146,7 @@ spec:
                     - name: build-context
                       value: "."
                     - name: dockerfile-dir
-                      value: services/frontend/fides
+                      value: apps/fides-web
                     - name: dockerfile-name
                       value: Dockerfile
                     - name: gitops-overlay-path
