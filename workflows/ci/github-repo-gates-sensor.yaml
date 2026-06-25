@@ -400,7 +400,7 @@ spec:
             - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
               dest: spec.arguments.parameters.6.value
     - template:
-        name: applicant-api-ci
+        name: java-ci
         conditions: business-repo-pr
         k8s:
           group: argoproj.io
@@ -412,7 +412,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: business-repo-applicant-api-
+                generateName: business-repo-java-ci-
                 namespace: argo
               spec:
                 workflowTemplateRef:
@@ -427,9 +427,9 @@ spec:
                     - name: base-ref
                     - name: head-ref
                     - name: gate-kind
-                      value: applicant-api-ci
+                      value: java-ci
                     - name: status-context
-                      value: spark/applicant-api-ci
+                      value: spark/java-ci
           parameters:
             - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
               dest: spec.arguments.parameters.0.value
