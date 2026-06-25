@@ -9,7 +9,7 @@ It contains:
 - `gh`
 - `buf`
 - Go toolchain
-- JDK 17 and Maven
+- JDK 21 and Maven
 - HTTPS Git support through tokens
 - `curl`
 - `jq`
