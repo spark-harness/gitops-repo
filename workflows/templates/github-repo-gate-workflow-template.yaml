@@ -34,7 +34,7 @@ spec:
       - name: gate-kind
       - name: status-context
       - name: janus-image
-        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-99-e5c6388-20260625-1455
+        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-114-400554b-20260625-2330
       - name: buf-image
         value: bufbuild/buf:1.47.2
       - name: node-image
