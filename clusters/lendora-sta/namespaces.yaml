@@ -36,6 +36,7 @@ metadata:
   name: lendora-sta-fides-bff
   labels:
     app.kubernetes.io/part-of: lendora
+    lendora.io/applicant-api-client: "true"
     lendora.io/environment: sta
 ---
 apiVersion: v1

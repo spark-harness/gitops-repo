@@ -34,7 +34,7 @@ spec:
       - name: gate-kind
       - name: status-context
       - name: janus-image
-        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-54-bootstrap-20260623-1608
+        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-99-e5c6388-20260625-1455
       - name: buf-image
         value: bufbuild/buf:1.47.2
       - name: node-image
@@ -86,6 +86,13 @@ spec:
               parameters:
                 - name: peer-repo
                   value: gitops-repo
+        - - name: checkout-janus
+            template: checkout-peer-repo
+            when: "'{{workflow.parameters.repo-name}}' != 'janus'"
+            arguments:
+              parameters:
+                - name: peer-repo
+                  value: janus
         - - name: run-harness-gates
             template: harness-gates
             when: "'{{workflow.parameters.gate-kind}}' == 'harness-gates'"
@@ -407,6 +414,16 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      sidecars:
+        - name: redis
+          image: redis:7.4-alpine
+          command:
+            - sh
+            - -c
+            - redis-server --save "" --appendonly no --requirepass "$REDIS_PASSWORD"
+          env:
+            - name: REDIS_PASSWORD
+              value: forest_dev_password
 
     - name: contract-dependency-scan
       container:

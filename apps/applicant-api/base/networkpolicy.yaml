@@ -23,10 +23,12 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: lendora-sta-fides-bff
+              lendora.io/applicant-api-client: "true"
       ports:
         - protocol: TCP
           port: 9090
+        - protocol: TCP
+          port: 8080
         - protocol: TCP
           port: 80
     - from:
