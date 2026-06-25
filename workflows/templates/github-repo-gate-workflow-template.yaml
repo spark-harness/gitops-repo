@@ -108,9 +108,9 @@ spec:
         - - name: run-fides-bff-ci
             template: fides-bff-ci
             when: "'{{workflow.parameters.gate-kind}}' == 'fides-bff-ci'"
-        - - name: run-applicant-api-ci
-            template: applicant-api-ci
-            when: "'{{workflow.parameters.gate-kind}}' == 'applicant-api-ci'"
+        - - name: run-java-ci
+            template: java-ci
+            when: "'{{workflow.parameters.gate-kind}}' == 'java-ci'"
         - - name: run-contract-dependency-scan
             template: contract-dependency-scan
             when: "'{{workflow.parameters.gate-kind}}' == 'contract-dependency-scan'"
@@ -125,6 +125,33 @@ spec:
                   value: success
                 - name: description
                   value: Spark Argo gate passed
+
+    - name: java-ci
+      dag:
+        tasks:
+          - name: plan
+            template: java-ci-plan
+          - name: money
+            dependencies: [plan]
+            template: java-ci-project
+            arguments:
+              parameters:
+                - name: project
+                  value: money
+          - name: spring-starter
+            dependencies: [plan]
+            template: java-ci-project
+            arguments:
+              parameters:
+                - name: project
+                  value: spring-starter
+          - name: applicant-api
+            dependencies: [spring-starter]
+            template: java-ci-project
+            arguments:
+              parameters:
+                - name: project
+                  value: applicant-api
 
     - name: checkout-source
       container:
@@ -382,9 +409,28 @@ spec:
           - name: workspace
             mountPath: /workspace
 
-    - name: applicant-api-ci
+    - name: java-ci-plan
       container:
-        image: "{{workflow.parameters.maven-image}}"
+        image: "{{workflow.parameters.janus-image}}"
+        workingDir: /workspace/business-repo
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            python3 tooling/java-quality/java_quality.py plan-git \
+              --base-ref "origin/{{workflow.parameters.base-ref}}" \
+              --output /workspace/java-quality-plan.json
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: java-ci-project
+      inputs:
+        parameters:
+          - name: project
+      container:
+        image: "{{workflow.parameters.janus-image}}"
         workingDir: /workspace/business-repo
         env:
           - name: IDL_JAVA_REPO_TOKEN
@@ -397,20 +443,26 @@ spec:
           - -ceu
         args:
           - |
-            base_ref="origin/{{workflow.parameters.base-ref}}"
-            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
-              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(apps/applicant-api/|packages/java/|.github/workflows/applicant-api-ci.yml)'; then
-                echo "No applicant-api or Java package changes; skipping."
-                exit 0
-              fi
+            if ! python3 tooling/java-quality/java_quality.py run-project \
+              "{{inputs.parameters.project}}" \
+              --plan /workspace/java-quality-plan.json \
+              --skip-unselected \
+              --dry-run-selected >/workspace/java-selected-{{inputs.parameters.project}}.txt; then
+              cat /workspace/java-selected-{{inputs.parameters.project}}.txt
+              exit 1
             fi
-            test -n "${IDL_JAVA_REPO_TOKEN}"
+            if grep -q '^JAVA_PROJECT_SKIP ' /workspace/java-selected-{{inputs.parameters.project}}.txt; then
+              cat /workspace/java-selected-{{inputs.parameters.project}}.txt
+              exit 0
+            fi
             mkdir -p ~/.m2
+            test -n "${IDL_JAVA_REPO_TOKEN}"
             printf '<settings><servers><server><id>github</id><username>x-access-token</username><password>%s</password></server></servers></settings>' "${IDL_JAVA_REPO_TOKEN}" > ~/.m2/settings.xml
             trap 'rm -f ~/.m2/settings.xml' EXIT
-            mvn -B -f packages/java/money/pom.xml test
-            mvn -B -f packages/java/spring-starter/pom.xml install
-            mvn -B -f apps/applicant-api/pom.xml test
+            python3 tooling/java-quality/java_quality.py run-project \
+              "{{inputs.parameters.project}}" \
+              --plan /workspace/java-quality-plan.json \
+              --skip-unselected
         volumeMounts:
           - name: workspace
             mountPath: /workspace
