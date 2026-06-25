@@ -400,6 +400,52 @@ spec:
             - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
               dest: spec.arguments.parameters.6.value
     - template:
+        name: applicant-api-ci
+        conditions: business-repo-pr
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: business-repo-applicant-api-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: github-repo-gate
+                arguments:
+                  parameters:
+                    - name: repo-owner
+                    - name: repo-name
+                    - name: commit-sha
+                    - name: pr-number
+                    - name: source-ref
+                    - name: base-ref
+                    - name: head-ref
+                    - name: gate-kind
+                      value: applicant-api-ci
+                    - name: status-context
+                      value: spark/applicant-api-ci
+          parameters:
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.owner.login}
+              dest: spec.arguments.parameters.0.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.repository.name}
+              dest: spec.arguments.parameters.1.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.sha}
+              dest: spec.arguments.parameters.2.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.number}
+              dest: spec.arguments.parameters.3.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.4.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.base.ref}
+              dest: spec.arguments.parameters.5.value
+            - src: {dependencyName: business-repo-pr, dataKey: body.pull_request.head.ref}
+              dest: spec.arguments.parameters.6.value
+    - template:
         name: contract-dependency-scan
         conditions: business-repo-pr
         k8s:

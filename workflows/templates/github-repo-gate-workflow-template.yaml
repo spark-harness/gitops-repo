@@ -34,7 +34,7 @@ spec:
       - name: gate-kind
       - name: status-context
       - name: janus-image
-        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-54-bootstrap-20260623-1608
+        value: registry.cn-shenzhen.aliyuncs.com/love-is-pain/janus-runner:LEN-99-e5c6388-20260625-1455
       - name: buf-image
         value: bufbuild/buf:1.47.2
       - name: node-image
@@ -43,6 +43,8 @@ spec:
         value: golang:1.26-bookworm
       - name: python-image
         value: python:3.13-bookworm
+      - name: maven-image
+        value: maven:3.9.11-eclipse-temurin-21
   templates:
     - name: run
       steps:
@@ -84,6 +86,13 @@ spec:
               parameters:
                 - name: peer-repo
                   value: gitops-repo
+        - - name: checkout-janus
+            template: checkout-peer-repo
+            when: "'{{workflow.parameters.repo-name}}' != 'janus'"
+            arguments:
+              parameters:
+                - name: peer-repo
+                  value: janus
         - - name: run-harness-gates
             template: harness-gates
             when: "'{{workflow.parameters.gate-kind}}' == 'harness-gates'"
@@ -99,6 +108,9 @@ spec:
         - - name: run-fides-bff-ci
             template: fides-bff-ci
             when: "'{{workflow.parameters.gate-kind}}' == 'fides-bff-ci'"
+        - - name: run-applicant-api-ci
+            template: applicant-api-ci
+            when: "'{{workflow.parameters.gate-kind}}' == 'applicant-api-ci'"
         - - name: run-contract-dependency-scan
             template: contract-dependency-scan
             when: "'{{workflow.parameters.gate-kind}}' == 'contract-dependency-scan'"
@@ -304,12 +316,12 @@ spec:
           - |
             base_ref="origin/{{workflow.parameters.base-ref}}"
             if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
-              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(services/frontend/fides/|.github/workflows/fides-ci.yml)'; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(apps/fides-web/|.github/workflows/fides-ci.yml)'; then
                 echo "No fides frontend changes; skipping."
                 exit 0
               fi
             fi
-            cd services/frontend/fides
+            cd apps/fides-web
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
             git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
             export GIT_CONFIG_COUNT=2
@@ -346,13 +358,13 @@ spec:
           - |
             base_ref="origin/{{workflow.parameters.base-ref}}"
             if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
-              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(packages/bffkit/|services/backend/fides-bff/|.github/workflows/fides-bff-ci.yml)'; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(packages/go/bffkit/|apps/fides-bff/|.github/workflows/fides-bff-ci.yml)'; then
                 echo "No fides-bff or bffkit changes; skipping."
                 exit 0
               fi
             fi
             git config --global url."https://x-access-token:${IDL_GO_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
-            cd services/backend/fides-bff
+            cd apps/fides-bff
             go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
             unformatted="$(gofmt -l .)"
             test -z "${unformatted}" || { echo "${unformatted}"; exit 1; }
@@ -360,7 +372,7 @@ spec:
             go build ./...
             go test ./... -count=1
             golangci-lint run ./...
-            cd /workspace/business-repo/packages/bffkit
+            cd /workspace/business-repo/packages/go/bffkit
             unformatted="$(gofmt -l .)"
             test -z "${unformatted}" || { echo "${unformatted}"; exit 1; }
             go vet ./...
@@ -369,6 +381,49 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+
+    - name: applicant-api-ci
+      container:
+        image: "{{workflow.parameters.maven-image}}"
+        workingDir: /workspace/business-repo
+        env:
+          - name: IDL_JAVA_REPO_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-source-token
+                key: token
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(apps/applicant-api/|packages/java/|.github/workflows/applicant-api-ci.yml)'; then
+                echo "No applicant-api or Java package changes; skipping."
+                exit 0
+              fi
+            fi
+            test -n "${IDL_JAVA_REPO_TOKEN}"
+            mkdir -p ~/.m2
+            printf '<settings><servers><server><id>github</id><username>x-access-token</username><password>%s</password></server></servers></settings>' "${IDL_JAVA_REPO_TOKEN}" > ~/.m2/settings.xml
+            trap 'rm -f ~/.m2/settings.xml' EXIT
+            mvn -B -f packages/java/money/pom.xml test
+            mvn -B -f packages/java/spring-starter/pom.xml install
+            mvn -B -f apps/applicant-api/pom.xml test
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      sidecars:
+        - name: redis
+          image: redis:7.4-alpine
+          command:
+            - sh
+            - -c
+            - redis-server --save "" --appendonly no --requirepass "$REDIS_PASSWORD"
+          env:
+            - name: REDIS_PASSWORD
+              value: forest_dev_password
 
     - name: contract-dependency-scan
       container:
@@ -379,10 +434,10 @@ spec:
           - -ceu
         args:
           - |
-            python3 -m unittest tests/test_contract_dependency_scan.py
+            python3 -m unittest tooling/contract-dependency-scan/tests/test_contract_dependency_scan.py
             base_ref="origin/{{workflow.parameters.base-ref}}"
             if ! git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
-              python3 scripts/contract_dependency_scan.py --mode rc-or-formal
+              python3 tooling/contract-dependency-scan/contract_dependency_scan.py --mode rc-or-formal
               exit 0
             fi
             mapfile -t changed_files < <(git diff --name-only "${base_ref}" HEAD)
@@ -396,7 +451,7 @@ spec:
               echo "No changed contract dependency declaration files; skipping scan."
               exit 0
             fi
-            python3 scripts/contract_dependency_scan.py --mode rc-or-formal "${args[@]}"
+            python3 tooling/contract-dependency-scan/contract_dependency_scan.py --mode rc-or-formal "${args[@]}"
         volumeMounts:
           - name: workspace
             mountPath: /workspace
