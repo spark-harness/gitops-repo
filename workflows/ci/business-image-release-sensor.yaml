@@ -22,7 +22,7 @@ spec:
               - refs/heads/master
   triggers:
     - template:
-        name: applicant-api-image
+        name: business-repo-image-release
         k8s:
           group: argoproj.io
           version: v1alpha1
@@ -33,7 +33,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: business-applicant-api-image-
+                generateName: business-repo-image-release-
                 namespace: argo
               spec:
                 workflowTemplateRef:
@@ -47,116 +47,12 @@ spec:
                     - name: commit-sha
                     - name: source-ref
                       value: master
-                    - name: image-repository
-                      value: ghcr.io/spark-harness/applicant-api
-                    - name: build-context
-                      value: "."
-                    - name: dockerfile-dir
-                      value: apps/applicant-api
-                    - name: dockerfile-name
-                      value: Dockerfile
-                    - name: gitops-overlay-path
-                      value: apps/applicant-api/overlays/lendora-sta
-                    - name: gitops-image-name
-                      value: ghcr.io/spark-harness/applicant-api
-                    - name: promote
-                      value: "true"
-                    - name: status-context
-                      value: spark/applicant-api-image
-          parameters:
-            - src:
-                dependencyName: business-repo-master-push
-                dataKey: body.after
-              dest: spec.arguments.parameters.2.value
-    - template:
-        name: fides-bff-image
-        k8s:
-          group: argoproj.io
-          version: v1alpha1
-          resource: workflows
-          operation: create
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                generateName: business-fides-bff-image-
-                namespace: argo
-              spec:
-                workflowTemplateRef:
-                  name: github-image-release
-                arguments:
-                  parameters:
-                    - name: repo-owner
-                      value: spark-harness
-                    - name: repo-name
-                      value: business-repo
-                    - name: commit-sha
-                    - name: source-ref
+                    - name: gitops-repo
+                      value: spark-harness/gitops-repo
+                    - name: gitops-branch
                       value: master
-                    - name: image-repository
-                      value: ghcr.io/spark-harness/fides-bff
-                    - name: build-context
-                      value: "."
-                    - name: dockerfile-dir
-                      value: apps/fides-bff
-                    - name: dockerfile-name
-                      value: Dockerfile
-                    - name: gitops-overlay-path
-                      value: apps/fides-bff/overlays/lendora-sta
-                    - name: gitops-image-name
-                      value: ghcr.io/spark-harness/fides-bff
-                    - name: promote
-                      value: "true"
                     - name: status-context
-                      value: spark/fides-bff-image
-          parameters:
-            - src:
-                dependencyName: business-repo-master-push
-                dataKey: body.after
-              dest: spec.arguments.parameters.2.value
-    - template:
-        name: fides-image
-        k8s:
-          group: argoproj.io
-          version: v1alpha1
-          resource: workflows
-          operation: create
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                generateName: business-fides-image-
-                namespace: argo
-              spec:
-                workflowTemplateRef:
-                  name: github-image-release
-                arguments:
-                  parameters:
-                    - name: repo-owner
-                      value: spark-harness
-                    - name: repo-name
-                      value: business-repo
-                    - name: commit-sha
-                    - name: source-ref
-                      value: master
-                    - name: image-repository
-                      value: ghcr.io/spark-harness/fides
-                    - name: build-context
-                      value: "."
-                    - name: dockerfile-dir
-                      value: apps/fides-web
-                    - name: dockerfile-name
-                      value: Dockerfile
-                    - name: gitops-overlay-path
-                      value: apps/fides/overlays/lendora-sta
-                    - name: gitops-image-name
-                      value: ghcr.io/spark-harness/fides
-                    - name: promote
-                      value: "true"
-                    - name: status-context
-                      value: spark/fides-image
+                      value: spark/business-image-release
           parameters:
             - src:
                 dependencyName: business-repo-master-push
