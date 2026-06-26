@@ -47,8 +47,9 @@ spec:
         value: maven:3.9.11-eclipse-temurin-21
   templates:
     - name: run
-      steps:
-        - - name: pending
+      dag:
+        tasks:
+          - name: pending
             template: github-status
             arguments:
               parameters:
@@ -56,68 +57,83 @@ spec:
                   value: pending
                 - name: description
                   value: Spark Argo gate started
-        - - name: checkout-source
+          - name: checkout-source
+            dependencies: [pending]
             template: checkout-source
-        - - name: checkout-harness
+          - name: checkout-harness
+            dependencies: [pending]
             template: checkout-peer-repo
             when: "'{{workflow.parameters.repo-name}}' != 'harness-repo'"
             arguments:
               parameters:
                 - name: peer-repo
                   value: harness-repo
-        - - name: checkout-business
+          - name: checkout-business
+            dependencies: [pending]
             template: checkout-peer-repo
             when: "'{{workflow.parameters.repo-name}}' != 'business-repo'"
             arguments:
               parameters:
                 - name: peer-repo
                   value: business-repo
-        - - name: checkout-idl
+          - name: checkout-idl
+            dependencies: [pending]
             template: checkout-peer-repo
             when: "'{{workflow.parameters.repo-name}}' != 'idl-repo'"
             arguments:
               parameters:
                 - name: peer-repo
                   value: idl-repo
-        - - name: checkout-gitops
+          - name: checkout-gitops
+            dependencies: [pending]
             template: checkout-peer-repo
             when: "'{{workflow.parameters.repo-name}}' != 'gitops-repo'"
             arguments:
               parameters:
                 - name: peer-repo
                   value: gitops-repo
-        - - name: checkout-janus
+          - name: checkout-janus
+            dependencies: [pending]
             template: checkout-peer-repo
             when: "'{{workflow.parameters.repo-name}}' != 'janus'"
             arguments:
               parameters:
                 - name: peer-repo
                   value: janus
-        - - name: run-harness-gates
+          - name: run-harness-gates
+            depends: "checkout-source.Succeeded && (checkout-harness.Succeeded || checkout-harness.Skipped) && (checkout-business.Succeeded || checkout-business.Skipped) && (checkout-idl.Succeeded || checkout-idl.Skipped) && (checkout-gitops.Succeeded || checkout-gitops.Skipped) && (checkout-janus.Succeeded || checkout-janus.Skipped)"
             template: harness-gates
             when: "'{{workflow.parameters.gate-kind}}' == 'harness-gates'"
-        - - name: run-delivery-readiness
+          - name: run-delivery-readiness
+            depends: "checkout-source.Succeeded && (checkout-harness.Succeeded || checkout-harness.Skipped) && (checkout-business.Succeeded || checkout-business.Skipped) && (checkout-idl.Succeeded || checkout-idl.Skipped) && (checkout-gitops.Succeeded || checkout-gitops.Skipped) && (checkout-janus.Succeeded || checkout-janus.Skipped)"
             template: delivery-readiness
             when: "'{{workflow.parameters.gate-kind}}' == 'delivery-readiness'"
-        - - name: run-pr-metadata
+          - name: run-pr-metadata
+            depends: "checkout-source.Succeeded && (checkout-harness.Succeeded || checkout-harness.Skipped) && (checkout-business.Succeeded || checkout-business.Skipped) && (checkout-idl.Succeeded || checkout-idl.Skipped) && (checkout-gitops.Succeeded || checkout-gitops.Skipped) && (checkout-janus.Succeeded || checkout-janus.Skipped)"
             template: pr-metadata
             when: "'{{workflow.parameters.gate-kind}}' == 'pr-metadata'"
-        - - name: run-fides-ci
+          - name: run-fides-ci
+            depends: "checkout-source.Succeeded && (checkout-business.Succeeded || checkout-business.Skipped)"
             template: fides-ci
             when: "'{{workflow.parameters.gate-kind}}' == 'fides-ci'"
-        - - name: run-fides-bff-ci
+          - name: run-fides-bff-ci
+            depends: "checkout-source.Succeeded && (checkout-business.Succeeded || checkout-business.Skipped)"
             template: fides-bff-ci
             when: "'{{workflow.parameters.gate-kind}}' == 'fides-bff-ci'"
-        - - name: run-java-ci
+          - name: run-java-ci
+            depends: "checkout-source.Succeeded && (checkout-business.Succeeded || checkout-business.Skipped)"
             template: java-ci
             when: "'{{workflow.parameters.gate-kind}}' == 'java-ci'"
-        - - name: run-contract-dependency-scan
+          - name: run-contract-dependency-scan
+            depends: "checkout-source.Succeeded && (checkout-business.Succeeded || checkout-business.Skipped)"
             template: contract-dependency-scan
             when: "'{{workflow.parameters.gate-kind}}' == 'contract-dependency-scan'"
-        - - name: run-idl-contract-gate
+          - name: run-idl-contract-gate
+            depends: "checkout-source.Succeeded && (checkout-idl.Succeeded || checkout-idl.Skipped)"
             template: idl-contract-gate
             when: "'{{workflow.parameters.gate-kind}}' == 'idl-contract-gate'"
-        - - name: success
+          - name: success
+            depends: "(run-harness-gates.Succeeded || run-harness-gates.Skipped || run-harness-gates.Omitted) && (run-delivery-readiness.Succeeded || run-delivery-readiness.Skipped || run-delivery-readiness.Omitted) && (run-pr-metadata.Succeeded || run-pr-metadata.Skipped || run-pr-metadata.Omitted) && (run-fides-ci.Succeeded || run-fides-ci.Skipped || run-fides-ci.Omitted) && (run-fides-bff-ci.Succeeded || run-fides-bff-ci.Skipped || run-fides-bff-ci.Omitted) && (run-java-ci.Succeeded || run-java-ci.Skipped || run-java-ci.Omitted) && (run-contract-dependency-scan.Succeeded || run-contract-dependency-scan.Skipped || run-contract-dependency-scan.Omitted) && (run-idl-contract-gate.Succeeded || run-idl-contract-gate.Skipped || run-idl-contract-gate.Omitted)"
             template: github-status
             arguments:
               parameters:
@@ -357,14 +373,68 @@ spec:
             export GIT_CONFIG_KEY_1="url.https://x-access-token:${GITHUB_TOKEN}@github.com/.insteadOf"
             export GIT_CONFIG_VALUE_1="ssh://git@github.com/"
             corepack enable
-            corepack prepare pnpm@10 --activate
+            pnpm_version="$(node -e "const pkg=require('./package.json'); console.log(pkg.packageManager.split('@').pop())")"
+            corepack prepare "pnpm@${pnpm_version}" --activate
             pnpm install --frozen-lockfile
             pnpm lint:deps
+            pnpm lint
+            pnpm exec vitest run --exclude '**/*.smoke.test.*'
+            pnpm build
         volumeMounts:
           - name: workspace
             mountPath: /workspace
 
     - name: fides-bff-ci
+      dag:
+        tasks:
+          - name: changed
+            template: fides-bff-change-plan
+          - name: bffkit
+            dependencies: [changed]
+            template: go-module-ci
+            arguments:
+              parameters:
+                - name: module-path
+                  value: packages/go/bffkit
+                - name: label
+                  value: bffkit
+          - name: fides-bff
+            dependencies: [changed]
+            template: go-module-ci
+            arguments:
+              parameters:
+                - name: module-path
+                  value: apps/fides-bff
+                - name: label
+                  value: fides-bff
+
+    - name: fides-bff-change-plan
+      container:
+        image: "{{workflow.parameters.go-image}}"
+        workingDir: /workspace/business-repo
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            base_ref="origin/{{workflow.parameters.base-ref}}"
+            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
+              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(packages/go/bffkit/|apps/fides-bff/|.github/workflows/fides-bff-ci.yml)'; then
+                echo "No fides-bff or bffkit changes; skipping."
+                touch /workspace/fides-bff-ci.skip
+                exit 0
+              fi
+            fi
+            rm -f /workspace/fides-bff-ci.skip
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: go-module-ci
+      inputs:
+        parameters:
+          - name: module-path
+          - name: label
       container:
         image: "{{workflow.parameters.go-image}}"
         workingDir: /workspace/business-repo
@@ -383,26 +453,17 @@ spec:
           - -ceu
         args:
           - |
-            base_ref="origin/{{workflow.parameters.base-ref}}"
-            if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null 2>&1; then
-              if ! git diff --name-only "${base_ref}" HEAD | grep -E '^(packages/go/bffkit/|apps/fides-bff/|.github/workflows/fides-bff-ci.yml)'; then
-                echo "No fides-bff or bffkit changes; skipping."
-                exit 0
-              fi
+            if [ -f /workspace/fides-bff-ci.skip ]; then
+              echo "No fides-bff or bffkit changes; skipping {{inputs.parameters.label}}."
+              exit 0
             fi
             git config --global url."https://x-access-token:${IDL_GO_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
-            cd apps/fides-bff
+            cd "{{inputs.parameters.module-path}}"
             go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
             unformatted="$(gofmt -l .)"
             test -z "${unformatted}" || { echo "${unformatted}"; exit 1; }
             go vet ./...
             go build ./...
-            go test ./... -count=1
-            golangci-lint run ./...
-            cd /workspace/business-repo/packages/go/bffkit
-            unformatted="$(gofmt -l .)"
-            test -z "${unformatted}" || { echo "${unformatted}"; exit 1; }
-            go vet ./...
             go test ./... -count=1
             golangci-lint run ./...
         volumeMounts:
