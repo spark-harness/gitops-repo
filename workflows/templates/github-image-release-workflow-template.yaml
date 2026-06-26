@@ -15,7 +15,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 5Gi
+            storage: 8Gi
   volumes:
     - name: registry-dockerconfig
       secret:
@@ -27,58 +27,119 @@ spec:
     parameters:
       - name: repo-owner
       - name: repo-name
+        value: business-repo
       - name: commit-sha
-      - name: pr-number
-        value: ""
       - name: source-ref
         value: master
-      - name: image-repository
-      - name: build-context
-        value: "."
-      - name: dockerfile-dir
-        value: "."
-      - name: dockerfile-name
-        value: Dockerfile
       - name: gitops-repo
         value: spark-harness/gitops-repo
       - name: gitops-branch
         value: master
-      - name: gitops-overlay-path
-        value: ""
-      - name: gitops-image-name
-        value: ""
-      - name: promote
-        value: "false"
       - name: status-context
-        value: spark/image-release
+        value: spark/business-image-release
+      - name: python-image
+        value: python:3.13-bookworm
+      - name: kubectl-image
+        value: bitnami/kubectl:1.31
   templates:
     - name: run
-      steps:
-        - - name: pending
+      dag:
+        tasks:
+          - name: pending
             template: github-status
             arguments:
               parameters:
                 - name: state
                   value: pending
                 - name: description
-                  value: Spark image release workflow started
-        - - name: checkout
+                  value: Spark business image release started
+          - name: checkout
+            dependencies: [pending]
             template: checkout-source
-        - - name: build
+          - name: build-applicant-api
+            dependencies: [checkout]
             template: build-image
-        - - name: scan
+            arguments:
+              parameters:
+                - name: image-key
+                  value: applicant-api
+                - name: image-repository
+                  value: ghcr.io/spark-harness/applicant-api
+                - name: build-context
+                  value: "."
+                - name: dockerfile-dir
+                  value: apps/applicant-api
+                - name: dockerfile-name
+                  value: Dockerfile
+          - name: build-fides-bff
+            dependencies: [checkout]
+            template: build-image
+            arguments:
+              parameters:
+                - name: image-key
+                  value: fides-bff
+                - name: image-repository
+                  value: ghcr.io/spark-harness/fides-bff
+                - name: build-context
+                  value: "."
+                - name: dockerfile-dir
+                  value: apps/fides-bff
+                - name: dockerfile-name
+                  value: Dockerfile
+          - name: build-fides
+            dependencies: [checkout]
+            template: build-image
+            arguments:
+              parameters:
+                - name: image-key
+                  value: fides
+                - name: image-repository
+                  value: ghcr.io/spark-harness/fides
+                - name: build-context
+                  value: "."
+                - name: dockerfile-dir
+                  value: apps/fides-web
+                - name: dockerfile-name
+                  value: Dockerfile
+          - name: scan-applicant-api
+            dependencies: [build-applicant-api]
             template: scan-image
-        - - name: promote
-            template: promote-gitops-digest
-            when: "{{workflow.parameters.promote}} == true"
-        - - name: success
+            arguments:
+              parameters:
+                - name: image-key
+                  value: applicant-api
+          - name: scan-fides-bff
+            dependencies: [build-fides-bff]
+            template: scan-image
+            arguments:
+              parameters:
+                - name: image-key
+                  value: fides-bff
+          - name: scan-fides
+            dependencies: [build-fides]
+            template: scan-image
+            arguments:
+              parameters:
+                - name: image-key
+                  value: fides
+          - name: update-gitops-digests
+            dependencies: [scan-applicant-api, scan-fides-bff, scan-fides]
+            template: update-gitops-digests
+          - name: validate-gitops-render
+            dependencies: [update-gitops-digests]
+            template: validate-gitops-render
+          - name: push-gitops-promotion
+            dependencies: [validate-gitops-render]
+            template: push-gitops-promotion
+          - name: success
+            dependencies: [push-gitops-promotion]
             template: github-status
             arguments:
               parameters:
                 - name: state
                   value: success
                 - name: description
-                  value: Spark image build, scan, and release checks passed
+                  value: Spark business images released and promoted
 
     - name: checkout-source
       container:
@@ -107,6 +168,13 @@ spec:
             mountPath: /workspace
 
     - name: build-image
+      inputs:
+        parameters:
+          - name: image-key
+          - name: image-repository
+          - name: build-context
+          - name: dockerfile-dir
+          - name: dockerfile-name
       container:
         image: moby/buildkit:rootless
         workingDir: /workspace/source
@@ -127,26 +195,23 @@ spec:
           - |
             set -eu
             short_sha="$(printf '%s' "{{workflow.parameters.commit-sha}}" | cut -c1-12)"
-            if [ -n "{{workflow.parameters.pr-number}}" ]; then
-              image_ref="{{workflow.parameters.image-repository}}:pr-{{workflow.parameters.pr-number}}-${short_sha}"
-            else
-              image_ref="{{workflow.parameters.image-repository}}:sha-${short_sha}"
-            fi
-            mkdir -p /workspace/image
+            image_ref="{{inputs.parameters.image-repository}}:sha-${short_sha}"
+            image_dir="/workspace/images/{{inputs.parameters.image-key}}"
+            mkdir -p "${image_dir}"
             buildctl-daemonless.sh build \
               --frontend dockerfile.v0 \
-              --local context="/workspace/source/{{workflow.parameters.build-context}}" \
-              --local dockerfile="/workspace/source/{{workflow.parameters.dockerfile-dir}}" \
-              --opt filename="{{workflow.parameters.dockerfile-name}}" \
+              --local context="/workspace/source/{{inputs.parameters.build-context}}" \
+              --local dockerfile="/workspace/source/{{inputs.parameters.dockerfile-dir}}" \
+              --opt filename="{{inputs.parameters.dockerfile-name}}" \
               --opt "label:org.opencontainers.image.revision={{workflow.parameters.commit-sha}}" \
               --secret id=github_token,env=GITHUB_TOKEN \
-              --metadata-file /workspace/image/metadata.json \
+              --metadata-file "${image_dir}/metadata.json" \
               --output "type=image,name=${image_ref},push=true"
-            digest="$(sed -n 's/.*"containerimage.digest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /workspace/image/metadata.json | head -n1)"
+            digest="$(sed -n 's/.*"containerimage.digest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${image_dir}/metadata.json" | head -n1)"
             test -n "${digest}"
-            printf '%s' "${image_ref}" > /workspace/image/ref
-            printf '%s' "${digest}" > /workspace/image/digest
-            printf '%s@%s' "{{workflow.parameters.image-repository}}" "${digest}" > /workspace/image/immutable-ref
+            printf '%s' "${image_ref}" > "${image_dir}/ref"
+            printf '%s' "${digest}" > "${image_dir}/digest"
+            printf '%s@%s' "{{inputs.parameters.image-repository}}" "${digest}" > "${image_dir}/immutable-ref"
         securityContext:
           privileged: true
           runAsGroup: 1000
@@ -159,6 +224,9 @@ spec:
             readOnly: true
 
     - name: scan-image
+      inputs:
+        parameters:
+          - name: image-key
       container:
         image: aquasec/trivy:0.58.2
         env:
@@ -170,7 +238,7 @@ spec:
         args:
           - |
             set -eu
-            image_ref="$(cat /workspace/image/immutable-ref)"
+            image_ref="$(cat /workspace/images/{{inputs.parameters.image-key}}/immutable-ref)"
             trivy image \
               --exit-code 1 \
               --severity HIGH,CRITICAL \
@@ -184,7 +252,86 @@ spec:
             mountPath: /workspace/docker
             readOnly: true
 
-    - name: promote-gitops-digest
+    - name: update-gitops-digests
+      container:
+        image: "{{workflow.parameters.python-image}}"
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-gitops-token
+                key: token
+        command:
+          - bash
+          - -ceu
+        args:
+          - |
+            apt-get update
+            apt-get install -y --no-install-recommends git
+            python3 -m pip install --no-cache-dir PyYAML==6.0.2
+            rm -rf /workspace/gitops
+            git clone --depth 1 --branch "{{workflow.parameters.gitops-branch}}" \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.gitops-repo}}.git" \
+              /workspace/gitops
+            cd /workspace/gitops
+            git remote set-url origin "https://github.com/{{workflow.parameters.gitops-repo}}.git"
+            python3 - <<'PY'
+            from pathlib import Path
+            import yaml
+
+            root = Path("/workspace/gitops")
+            releases = [
+                {
+                    "overlay": "apps/applicant-api/overlays/lendora-sta/kustomization.yaml",
+                    "image": "ghcr.io/spark-harness/applicant-api",
+                    "digest": Path("/workspace/images/applicant-api/digest").read_text(encoding="utf-8").strip(),
+                },
+                {
+                    "overlay": "apps/fides-bff/overlays/lendora-sta/kustomization.yaml",
+                    "image": "ghcr.io/spark-harness/fides-bff",
+                    "digest": Path("/workspace/images/fides-bff/digest").read_text(encoding="utf-8").strip(),
+                },
+                {
+                    "overlay": "apps/fides/overlays/lendora-sta/kustomization.yaml",
+                    "image": "ghcr.io/spark-harness/fides",
+                    "digest": Path("/workspace/images/fides/digest").read_text(encoding="utf-8").strip(),
+                },
+            ]
+
+            for release in releases:
+                file = root / release["overlay"]
+                data = yaml.safe_load(file.read_text(encoding="utf-8"))
+                images = data.setdefault("images", [])
+                for image in images:
+                    if image.get("name") == release["image"]:
+                        image["digest"] = release["digest"]
+                        image.pop("newTag", None)
+                        break
+                else:
+                    images.append({"name": release["image"], "digest": release["digest"]})
+                file.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            PY
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: validate-gitops-render
+      container:
+        image: "{{workflow.parameters.kubectl-image}}"
+        command:
+          - sh
+          - -ceu
+        args:
+          - |
+            kubectl kustomize /workspace/gitops/apps/applicant-api/overlays/lendora-sta >/tmp/applicant-api.yaml
+            kubectl kustomize /workspace/gitops/apps/fides-bff/overlays/lendora-sta >/tmp/fides-bff.yaml
+            kubectl kustomize /workspace/gitops/apps/fides/overlays/lendora-sta >/tmp/fides.yaml
+            kubectl kustomize /workspace/gitops/clusters/lendora-sta >/tmp/lendora-sta.yaml
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: push-gitops-promotion
       container:
         image: alpine/git:2.47.2
         env:
@@ -195,41 +342,19 @@ spec:
                 key: token
         command:
           - sh
-          - -c
+          - -ceu
         args:
           - |
-            set -eu
-            test -n "{{workflow.parameters.gitops-overlay-path}}"
-            test -n "{{workflow.parameters.gitops-image-name}}"
-            digest="$(cat /workspace/image/digest)"
-            rm -rf /workspace/gitops
-            git clone --depth 1 --branch "{{workflow.parameters.gitops-branch}}" \
-              "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.gitops-repo}}.git" \
-              /workspace/gitops
-            file="/workspace/gitops/{{workflow.parameters.gitops-overlay-path}}/kustomization.yaml"
-            test -f "${file}"
-            awk -v image="{{workflow.parameters.gitops-image-name}}" -v digest="${digest}" '
-              index($0, "name: " image) > 0 {
-                print
-                if (getline > 0) {
-                  if ($0 ~ /^[[:space:]]*(newTag|digest):/) {
-                    print "    digest: " digest
-                    next
-                  }
-                  print "    digest: " digest
-                  print
-                  next
-                }
-              }
-              { print }
-            ' "${file}" > "${file}.tmp"
-            mv "${file}.tmp" "${file}"
             cd /workspace/gitops
             git config user.name "spark-argo"
             git config user.email "spark-argo@users.noreply.github.com"
-            git add "${file}"
+            git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.gitops-repo}}.git"
+            git add \
+              apps/applicant-api/overlays/lendora-sta/kustomization.yaml \
+              apps/fides-bff/overlays/lendora-sta/kustomization.yaml \
+              apps/fides/overlays/lendora-sta/kustomization.yaml
             git diff --staged --quiet && exit 0
-            git commit -m "chore(gitops): promote {{workflow.parameters.repo-name}} image {{workflow.parameters.commit-sha}}"
+            git commit -m "chore(gitops): promote business images {{workflow.parameters.commit-sha}}"
             git push origin HEAD:"{{workflow.parameters.gitops-branch}}"
         volumeMounts:
           - name: workspace
@@ -270,4 +395,4 @@ spec:
                 - name: state
                   value: failure
                 - name: description
-                  value: Spark image release workflow failed
+                  value: Spark business image release failed
