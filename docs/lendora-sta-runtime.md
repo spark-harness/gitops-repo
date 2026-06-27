@@ -31,10 +31,13 @@ kubectl -n lendora-sta-redis create secret generic redis-auth \
 kubectl -n lendora-sta-applicant-api create secret generic applicant-api-runtime \
   --from-literal=db-password='<redacted>' \
   --from-literal=redis-password='<redacted>' \
-  --from-literal=token-secret='<redacted>'
+  --from-literal=token-secret='<redacted>' \
+  --from-literal=otlp-traces-headers='<redacted>'
 ```
 
 如果后续采用 ExternalSecret 或 SealedSecret，应替换这些 bootstrap 命令并保留 Secret 名称和 key 兼容性。
+
+`apps/applicant-api/base/consul-config.yaml` 只写入 `config/applicant-api/data` 中的非密 YAML。数据库密码、Redis 密码、token secret 和 OTLP header 仍必须通过 `applicant-api-runtime` Secret 注入。
 
 ## Image promotion
 
