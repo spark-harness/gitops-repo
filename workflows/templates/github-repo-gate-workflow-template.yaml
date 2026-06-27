@@ -168,6 +168,13 @@ spec:
               parameters:
                 - name: project
                   value: applicant-api
+          - name: quote-api
+            dependencies: [spring-starter]
+            template: java-ci-project
+            arguments:
+              parameters:
+                - name: project
+                  value: quote-api
 
     - name: checkout-source
       container:
