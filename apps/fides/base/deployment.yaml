@@ -26,9 +26,15 @@ spec:
             - name: http
               containerPort: 3000
           env:
-            - name: NEXT_PUBLIC_FIDES_OTP_ADAPTER
+            - name: FIDES_RUNTIME_ENV
+              value: sta
+            - name: FIDES_RUNTIME_CONFIG_CONSUL_URL
+              value: http://consul.lendora-sta-consul.svc.cluster.local:8500
+            - name: FIDES_RUNTIME_CONFIG_CONSUL_KEY
+              value: spark/lendora/sta/fides-web/runtime-config
+            - name: FIDES_OTP_ADAPTER
               value: real
-            - name: NEXT_PUBLIC_FIDES_BFF_BASE_URL
+            - name: FIDES_BFF_BASE_URL
               value: /api/v1
           readinessProbe:
             httpGet:
