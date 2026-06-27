@@ -32,21 +32,26 @@ spec:
             - configMapRef:
                 name: applicant-api-config
           env:
-            - name: APPLICANT_DB_PASSWORD
+            - name: SPARK_APPLICANT_AUTH_JDBC_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: applicant-api-runtime
                   key: db-password
-            - name: APPLICANT_REDIS_PASSWORD
+            - name: SPRING_DATA_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: applicant-api-runtime
                   key: redis-password
-            - name: APPLICANT_TOKEN_SECRET
+            - name: SPARK_APPLICANT_AUTH_TOKEN_SECRET
               valueFrom:
                 secretKeyRef:
                   name: applicant-api-runtime
                   key: token-secret
+            - name: OTEL_EXPORTER_OTLP_TRACES_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: applicant-api-runtime
+                  key: otlp-traces-headers
           readinessProbe:
             httpGet:
               path: /ready
