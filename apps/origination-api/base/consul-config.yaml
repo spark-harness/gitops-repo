@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: origination-api-consul-config
+  labels:
+    app.kubernetes.io/name: origination-api
+    app.kubernetes.io/part-of: lendora
+data:
+  origination-api.yml: |
+    spark:
+      origination:
+        quote-api-base-url: http://quote-api.lendora-sta-quote-api.svc.cluster.local
+        quote-api-timeout: 3s
+        consul:
+          enabled: true
+          service-name: origination-api
+          service-address: origination-api.lendora-sta-origination-api.svc.cluster.local
+          http-port: 80
+          health-check-url: http://origination-api.lendora-sta-origination-api.svc.cluster.local:80/ready
+    otel:
+      service:
+        name: origination-api
+      traces:
+        exporter: otlp
+        sampler: parentbased_traceidratio
+        sampler.arg: 0.1
+      exporter:
+        otlp:
+          traces:
+            protocol: http/protobuf
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: origination-api-consul-config
+  labels:
+    app.kubernetes.io/name: origination-api
+    app.kubernetes.io/part-of: lendora
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: origination-api-consul-config
+        app.kubernetes.io/part-of: lendora
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: consul-config
+          image: curlimages/curl:8.11.1
+          command:
+            - sh
+            - -ceu
+            - |
+              curl --fail --request PUT --data-binary @/config/origination-api.yml \
+                http://consul.lendora-sta-consul.svc.cluster.local:8500/v1/kv/config/origination-api/data
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: origination-api-consul-config

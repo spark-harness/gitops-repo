@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: origination-api
+  labels:
+    app.kubernetes.io/name: origination-api
+    app.kubernetes.io/part-of: lendora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: origination-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: origination-api
+        app.kubernetes.io/part-of: lendora
+    spec:
+      serviceAccountName: origination-api
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: origination-api
+          image: ghcr.io/spark-harness/origination-api:replace-me
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: origination-api-config
+          env:
+            - name: ORIGINATION_JDBC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: origination-api-runtime
+                  key: db-password
+            - name: OTEL_EXPORTER_OTLP_TRACES_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: origination-api-runtime
+                  key: otlp-traces-headers
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi

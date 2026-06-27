@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: origination-api-config
+  labels:
+    app.kubernetes.io/name: origination-api
+    app.kubernetes.io/part-of: lendora
+data:
+  SPRING_PROFILES_ACTIVE: sta
+  SERVER_PORT: "8080"
+  ORIGINATION_JDBC_URL: jdbc:postgresql://postgres.lendora-sta-postgres.svc.cluster.local:5432/origination
+  ORIGINATION_JDBC_USERNAME: origination
+  ORIGINATION_QUOTE_API_BASE_URL: http://quote-api.lendora-sta-quote-api.svc.cluster.local
+  ORIGINATION_QUOTE_API_TIMEOUT: 3s
+  SPARK_ORIGINATION_CONSUL_ENABLED: "true"
+  SPARK_ORIGINATION_CONSUL_URL: http://consul.lendora-sta-consul.svc.cluster.local:8500
+  SPARK_ORIGINATION_CONSUL_SERVICE_NAME: origination-api
+  SPARK_ORIGINATION_CONSUL_SERVICE_ADDRESS: origination-api.lendora-sta-origination-api.svc.cluster.local
+  SPARK_ORIGINATION_CONSUL_HTTP_PORT: "80"
+  SPARK_ORIGINATION_CONSUL_HEALTH_CHECK_URL: http://origination-api.lendora-sta-origination-api.svc.cluster.local:80/ready
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector.lendora-sta-observability.svc.cluster.local:4318/v1/traces

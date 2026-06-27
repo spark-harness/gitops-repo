@@ -28,6 +28,13 @@ patches:
         path: /metadata/namespace
         value: lendora-sta-postgres
   - target:
+      kind: Job
+      name: origination-postgres-init
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-sta-postgres
+  - target:
       kind: Deployment
       name: redis
     patch: |-

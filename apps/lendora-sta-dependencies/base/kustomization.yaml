@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - postgres.yaml
   - quote-postgres-init.yaml
+  - origination-postgres-init.yaml
   - redis.yaml
   - consul.yaml
