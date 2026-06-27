@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lendora-sta-origination-api
+  namespace: argocd
+spec:
+  project: lendora-sta
+  source:
+    repoURL: https://github.com/spark-harness/gitops-repo.git
+    targetRevision: master
+    path: apps/origination-api/overlays/lendora-sta
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lendora-sta-origination-api
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

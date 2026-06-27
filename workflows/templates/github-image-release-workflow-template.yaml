@@ -116,6 +116,21 @@ spec:
                   value: apps/quote-api
                 - name: dockerfile-name
                   value: Dockerfile
+          - name: build-origination-api
+            dependencies: [checkout]
+            template: build-image
+            arguments:
+              parameters:
+                - name: image-key
+                  value: origination-api
+                - name: image-repository
+                  value: ghcr.io/spark-harness/origination-api
+                - name: build-context
+                  value: "."
+                - name: dockerfile-dir
+                  value: apps/origination-api
+                - name: dockerfile-name
+                  value: Dockerfile
           - name: scan-applicant-api
             dependencies: [build-applicant-api]
             template: scan-image
@@ -144,8 +159,15 @@ spec:
               parameters:
                 - name: image-key
                   value: quote-api
+          - name: scan-origination-api
+            dependencies: [build-origination-api]
+            template: scan-image
+            arguments:
+              parameters:
+                - name: image-key
+                  value: origination-api
           - name: update-gitops-digests
-            dependencies: [scan-applicant-api, scan-fides-bff, scan-fides, scan-quote-api]
+            dependencies: [scan-applicant-api, scan-fides-bff, scan-fides, scan-quote-api, scan-origination-api]
             template: update-gitops-digests
           - name: validate-gitops-render
             dependencies: [update-gitops-digests]
@@ -323,6 +345,11 @@ spec:
                     "image": "ghcr.io/spark-harness/quote-api",
                     "digest": Path("/workspace/images/quote-api/digest").read_text(encoding="utf-8").strip(),
                 },
+                {
+                    "overlay": "apps/origination-api/overlays/lendora-sta/kustomization.yaml",
+                    "image": "ghcr.io/spark-harness/origination-api",
+                    "digest": Path("/workspace/images/origination-api/digest").read_text(encoding="utf-8").strip(),
+                },
             ]
 
             for release in releases:
@@ -354,6 +381,7 @@ spec:
             kubectl kustomize /workspace/gitops/apps/fides-bff/overlays/lendora-sta >/tmp/fides-bff.yaml
             kubectl kustomize /workspace/gitops/apps/fides/overlays/lendora-sta >/tmp/fides.yaml
             kubectl kustomize /workspace/gitops/apps/quote-api/overlays/lendora-sta >/tmp/quote-api.yaml
+            kubectl kustomize /workspace/gitops/apps/origination-api/overlays/lendora-sta >/tmp/origination-api.yaml
             kubectl kustomize /workspace/gitops/clusters/lendora-sta >/tmp/lendora-sta.yaml
         volumeMounts:
           - name: workspace
@@ -381,7 +409,8 @@ spec:
               apps/applicant-api/overlays/lendora-sta/kustomization.yaml \
               apps/fides-bff/overlays/lendora-sta/kustomization.yaml \
               apps/fides/overlays/lendora-sta/kustomization.yaml \
-              apps/quote-api/overlays/lendora-sta/kustomization.yaml
+              apps/quote-api/overlays/lendora-sta/kustomization.yaml \
+              apps/origination-api/overlays/lendora-sta/kustomization.yaml
             git diff --staged --quiet && exit 0
             git commit -m "chore(gitops): promote business images {{workflow.parameters.commit-sha}}"
             git push origin HEAD:"{{workflow.parameters.gitops-branch}}"
