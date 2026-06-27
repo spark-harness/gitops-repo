@@ -16,6 +16,8 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: lendora-sta-applicant-api
       server: https://kubernetes.default.svc
+    - namespace: lendora-sta-quote-api
+      server: https://kubernetes.default.svc
     - namespace: lendora-sta-fides-bff
       server: https://kubernetes.default.svc
     - namespace: lendora-sta-fides

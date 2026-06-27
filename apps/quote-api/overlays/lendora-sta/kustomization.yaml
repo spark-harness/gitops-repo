@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-sta-quote-api
+resources:
+- ../../base
+images:
+- name: ghcr.io/spark-harness/quote-api
+  digest: sha256:551b29fdf5f31be37ed962890e5d61b89163d27d2810087a041cd7074124df63
+replicas:
+- name: quote-api
+  count: 1
+labels:
+- pairs:
+    lendora.io/environment: sta

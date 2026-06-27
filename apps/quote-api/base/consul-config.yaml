@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quote-api-consul-config
+  labels:
+    app.kubernetes.io/name: quote-api
+    app.kubernetes.io/part-of: lendora
+data:
+  quote-api.yml: |
+    spark:
+      quote:
+        validity: 30m
+        consul:
+          enabled: true
+          service-name: quote-api
+          service-address: quote-api.lendora-sta-quote-api.svc.cluster.local
+          http-port: 80
+          health-check-url: http://quote-api.lendora-sta-quote-api.svc.cluster.local:80/ready
+    otel:
+      service:
+        name: quote-api
+      traces:
+        exporter: otlp
+        sampler: parentbased_traceidratio
+        sampler.arg: 0.1
+      exporter:
+        otlp:
+          traces:
+            protocol: http/protobuf
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: quote-api-consul-config
+  labels:
+    app.kubernetes.io/name: quote-api
+    app.kubernetes.io/part-of: lendora
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quote-api-consul-config
+        app.kubernetes.io/part-of: lendora
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: consul-config
+          image: curlimages/curl:8.11.1
+          command:
+            - sh
+            - -ceu
+            - |
+              curl --fail --request PUT --data-binary @/config/quote-api.yml \
+                http://consul.lendora-sta-consul.svc.cluster.local:8500/v1/kv/config/quote-api/data
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: quote-api-consul-config
