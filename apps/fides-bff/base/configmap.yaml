@@ -38,6 +38,9 @@ data:
       http:
         base_url: ""
         timeout: 3s
+    auth:
+      token_mode: hmac
+      access_token_ttl: 1h
     registry:
       consul:
         enabled: true
