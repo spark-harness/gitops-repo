@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: quote-api
+  labels:
+    app.kubernetes.io/name: quote-api
+    app.kubernetes.io/part-of: lendora
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: quote-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

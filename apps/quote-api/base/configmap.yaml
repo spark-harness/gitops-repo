@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quote-api-config
+  labels:
+    app.kubernetes.io/name: quote-api
+    app.kubernetes.io/part-of: lendora
+data:
+  SPRING_PROFILES_ACTIVE: sta
+  SERVER_PORT: "8080"
+  QUOTE_JDBC_URL: jdbc:postgresql://postgres.lendora-sta-postgres.svc.cluster.local:5432/quote
+  QUOTE_JDBC_USERNAME: quote
+  SPARK_QUOTE_CONSUL_ENABLED: "true"
+  SPARK_QUOTE_CONSUL_URL: http://consul.lendora-sta-consul.svc.cluster.local:8500
+  SPARK_QUOTE_CONSUL_SERVICE_NAME: quote-api
+  SPARK_QUOTE_CONSUL_SERVICE_ADDRESS: quote-api.lendora-sta-quote-api.svc.cluster.local
+  SPARK_QUOTE_CONSUL_HTTP_PORT: "80"
+  SPARK_QUOTE_CONSUL_HEALTH_CHECK_URL: http://quote-api.lendora-sta-quote-api.svc.cluster.local:80/ready
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector.lendora-sta-observability.svc.cluster.local:4318/v1/traces

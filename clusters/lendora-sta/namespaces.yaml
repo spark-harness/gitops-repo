@@ -33,10 +33,19 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: lendora-sta-quote-api
+  labels:
+    app.kubernetes.io/part-of: lendora
+    lendora.io/environment: sta
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: lendora-sta-fides-bff
   labels:
     app.kubernetes.io/part-of: lendora
     lendora.io/applicant-api-client: "true"
+    lendora.io/quote-api-client: "true"
     lendora.io/environment: sta
 ---
 apiVersion: v1

@@ -13,6 +13,7 @@
 | `clusters/lendora-sta/` | app-of-apps、namespace、AppProject、Argo CD Application |
 | `apps/lendora-sta-dependencies/overlays/sta` | PostgreSQL、Redis、Consul |
 | `apps/applicant-api/overlays/lendora-sta` | 内网身份服务 |
+| `apps/quote-api/overlays/lendora-sta` | 内网试算服务 |
 | `apps/fides-bff/overlays/lendora-sta` | 公网 API 边界 |
 | `apps/fides/overlays/lendora-sta` | 公网前端 |
 
@@ -33,11 +34,19 @@ kubectl -n lendora-sta-applicant-api create secret generic applicant-api-runtime
   --from-literal=redis-password='<redacted>' \
   --from-literal=token-secret='<redacted>' \
   --from-literal=otlp-traces-headers='<redacted>'
+
+kubectl -n lendora-sta-postgres create secret generic quote-api-runtime \
+  --from-literal=db-password='<redacted>' \
+  --from-literal=otlp-traces-headers='<redacted>'
+
+kubectl -n lendora-sta-quote-api create secret generic quote-api-runtime \
+  --from-literal=db-password='<redacted>' \
+  --from-literal=otlp-traces-headers='<redacted>'
 ```
 
 如果后续采用 ExternalSecret 或 SealedSecret，应替换这些 bootstrap 命令并保留 Secret 名称和 key 兼容性。
 
-`apps/applicant-api/base/consul-config.yaml` 只写入 `config/applicant-api/data` 中的非密 YAML。数据库密码、Redis 密码、token secret 和 OTLP header 仍必须通过 `applicant-api-runtime` Secret 注入。
+`apps/applicant-api/base/consul-config.yaml` 和 `apps/quote-api/base/consul-config.yaml` 只写入 Consul 中的非密 YAML。数据库密码、Redis 密码、token secret 和 OTLP header 仍必须通过对应 runtime Secret 注入。
 
 ## Image promotion
 
@@ -46,6 +55,7 @@ kubectl -n lendora-sta-applicant-api create secret generic applicant-api-runtime
 | Service | Overlay | Image name |
 |---|---|---|
 | applicant-api | `apps/applicant-api/overlays/lendora-sta` | `ghcr.io/spark-harness/applicant-api` |
+| quote-api | `apps/quote-api/overlays/lendora-sta` | `ghcr.io/spark-harness/quote-api` |
 | fides-bff | `apps/fides-bff/overlays/lendora-sta` | `ghcr.io/spark-harness/fides-bff` |
 | fides | `apps/fides/overlays/lendora-sta` | `ghcr.io/spark-harness/fides` |
 
@@ -65,6 +75,7 @@ promote=true
 | Service | dockerfile-dir |
 |---|---|
 | applicant-api | `apps/applicant-api` |
+| quote-api | `apps/quote-api` |
 | fides-bff | `apps/fides-bff` |
 | fides | `apps/fides-web` |
 
@@ -74,6 +85,7 @@ promote=true
 kubectl kustomize clusters/lendora-sta
 kubectl kustomize apps/lendora-sta-dependencies/overlays/sta
 kubectl kustomize apps/applicant-api/overlays/lendora-sta
+kubectl kustomize apps/quote-api/overlays/lendora-sta
 kubectl kustomize apps/fides-bff/overlays/lendora-sta
 kubectl kustomize apps/fides/overlays/lendora-sta
 ```

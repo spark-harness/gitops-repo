@@ -8,3 +8,4 @@ resources:
   - argocd-apps/applicant-api.yaml
   - argocd-apps/fides-bff.yaml
   - argocd-apps/fides.yaml
+  - argocd-apps/quote-api.yaml
