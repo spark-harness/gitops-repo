@@ -22,6 +22,22 @@ data:
       grpc:
         timeout: 3s
         plaintext: true
+    quote:
+      consul:
+        address: consul.lendora-sta-consul.svc.cluster.local:8500
+        scheme: http
+        service_name: quote-api
+      http:
+        base_url: ""
+        timeout: 3s
+    origination:
+      consul:
+        address: consul.lendora-sta-consul.svc.cluster.local:8500
+        scheme: http
+        service_name: origination-api
+      http:
+        base_url: ""
+        timeout: 3s
     registry:
       consul:
         enabled: true
