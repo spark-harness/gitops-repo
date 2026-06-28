@@ -154,7 +154,7 @@ spec:
               branch_exists=false
             fi
             cd /workspace/idl-repo
-            buf generate --template buf.gen.openapi.yaml --path vesta/lendora/fides-bff/v1/auth.proto
+            buf generate --template buf.gen.openapi.yaml --path vesta/lendora/fides-bff/v1
             install -d /workspace/idl-openapi-repo/vesta/lendora/fides-bff/v1
             cp /workspace/.generated/openapi/openapi.yaml /workspace/idl-openapi-repo/vesta/lendora/fides-bff/v1/openapi.yaml
             cd /workspace/idl-openapi-repo
