@@ -1,0 +1,99 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-sta-1
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/spark-harness/quote-api
+    digest: sha256:52373dfe19fdee70bb3ef081b7c64b280804e5e6cc6de962b0d380f71e2b1915
+replicas:
+  - name: quote-api
+    count: 1
+labels:
+  - pairs:
+      lendora.io/environment: sta-1
+patches:
+  - target:
+      kind: ConfigMap
+      name: quote-api-config
+    patch: |-
+      - op: replace
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: sta-1
+      - op: replace
+        path: /data/QUOTE_JDBC_URL
+        value: jdbc:postgresql://postgres.lendora-shared-postgres.svc.cluster.local:5432/sta_1_quote
+      - op: replace
+        path: /data/QUOTE_JDBC_USERNAME
+        value: sta_1_quote
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_URL
+        value: http://consul.lendora-shared-consul.svc.cluster.local:8500
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_SERVICE_NAME
+        value: sta-1-quote-api
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_SERVICE_ADDRESS
+        value: quote-api.lendora-sta-1.svc.cluster.local
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_HEALTH_CHECK_URL
+        value: http://quote-api.lendora-sta-1.svc.cluster.local:80/ready
+  - target:
+      kind: ConfigMap
+      name: quote-api-consul-config
+    patch: |-
+      - op: replace
+        path: /data/quote-api.yml
+        value: |
+          spark:
+            quote:
+              validity: 30m
+              consul:
+                enabled: true
+                service-name: sta-1-quote-api
+                service-address: quote-api.lendora-sta-1.svc.cluster.local
+                http-port: 80
+                health-check-url: http://quote-api.lendora-sta-1.svc.cluster.local:80/ready
+          otel:
+            service:
+              name: quote-api
+            traces:
+              exporter: otlp
+              sampler: parentbased_traceidratio
+              sampler.arg: 0.1
+            exporter:
+              otlp:
+                traces:
+                  protocol: http/protobuf
+  - target:
+      kind: Job
+      name: quote-api-consul-config
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/command/2
+        value: |
+          curl --fail --request PUT --data-binary @/config/quote-api.yml \
+            http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/sta-1/quote-api/config
+  - target:
+      kind: NetworkPolicy
+      name: quote-api-ingress
+    patch: |-
+      - op: replace
+        path: /spec/ingress
+        value:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-sta-1
+            ports:
+              - protocol: TCP
+                port: 8080
+              - protocol: TCP
+                port: 80
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-shared-consul
+            ports:
+              - protocol: TCP
+                port: 8080

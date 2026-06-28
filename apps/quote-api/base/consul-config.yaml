@@ -12,10 +12,10 @@ data:
         validity: 30m
         consul:
           enabled: true
-          service-name: quote-api
-          service-address: quote-api.lendora-sta-quote-api.svc.cluster.local
+          service-name: sta-1-quote-api
+          service-address: quote-api.lendora-sta-1.svc.cluster.local
           http-port: 80
-          health-check-url: http://quote-api.lendora-sta-quote-api.svc.cluster.local:80/ready
+          health-check-url: http://quote-api.lendora-sta-1.svc.cluster.local:80/ready
     otel:
       service:
         name: quote-api
@@ -51,7 +51,7 @@ spec:
             - -ceu
             - |
               curl --fail --request PUT --data-binary @/config/quote-api.yml \
-                http://consul.lendora-sta-consul.svc.cluster.local:8500/v1/kv/config/quote-api/data
+                http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/sta-1/quote-api/config
           volumeMounts:
             - name: config
               mountPath: /config

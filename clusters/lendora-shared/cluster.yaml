@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lendora-shared-cluster
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: lendora-shared
+    app.kubernetes.io/part-of: lendora
+data:
+  environment: shared
+  runtimeOwner: LEN-136
+  namespaces: lendora-shared-postgres,lendora-shared-redis,lendora-shared-consul

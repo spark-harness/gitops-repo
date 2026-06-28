@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-sta-1
+resources:
+  - ../../base
+  - runtime-config-consul.yaml
+images:
+  - name: ghcr.io/spark-harness/fides
+    digest: sha256:37212ca4e5a028dbc41c707aa214f2fd8955f77ecf0e8de98cc98a2e2fb98c8f
+replicas:
+  - name: fides
+    count: 1
+labels:
+  - pairs:
+      lendora.io/environment: sta-1
+patches:
+  - target:
+      kind: Deployment
+      name: fides
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: sta-1
+      - op: replace
+        path: /spec/template/spec/containers/0/env/1/value
+        value: http://consul.lendora-shared-consul.svc.cluster.local:8500
+      - op: replace
+        path: /spec/template/spec/containers/0/env/2/value
+        value: spark/lendora/sta-1/fides-web/runtime-config
+      - op: replace
+        path: /spec/template/spec/containers/0/env/4/value
+        value: https://sta-1-api.fuzzytails.fun/api/v1

@@ -9,14 +9,14 @@ data:
   origination-api.yml: |
     spark:
       origination:
-        quote-api-base-url: http://quote-api.lendora-sta-quote-api.svc.cluster.local
+        quote-api-base-url: http://quote-api.lendora-sta-1.svc.cluster.local
         quote-api-timeout: 3s
         consul:
           enabled: true
-          service-name: origination-api
-          service-address: origination-api.lendora-sta-origination-api.svc.cluster.local
+          service-name: sta-1-origination-api
+          service-address: origination-api.lendora-sta-1.svc.cluster.local
           http-port: 80
-          health-check-url: http://origination-api.lendora-sta-origination-api.svc.cluster.local:80/ready
+          health-check-url: http://origination-api.lendora-sta-1.svc.cluster.local:80/ready
     otel:
       service:
         name: origination-api
@@ -52,7 +52,7 @@ spec:
             - -ceu
             - |
               curl --fail --request PUT --data-binary @/config/origination-api.yml \
-                http://consul.lendora-sta-consul.svc.cluster.local:8500/v1/kv/config/origination-api/data
+                http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/sta-1/origination-api/config
           volumeMounts:
             - name: config
               mountPath: /config

@@ -16,7 +16,7 @@ data:
           migrations-enabled: false
           consul:
             enabled: true
-            service-name: applicant-api
+            service-name: sta-1-applicant-api
             health-check-path: /ready
     otel:
       traces:
@@ -51,7 +51,7 @@ spec:
             - -ceu
             - |
               curl --fail --request PUT --data-binary @/config/applicant-api.yml \
-                http://consul.lendora-sta-consul.svc.cluster.local:8500/v1/kv/config/applicant-api/data
+                http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/sta-1/applicant-api/config
           volumeMounts:
             - name: config
               mountPath: /config

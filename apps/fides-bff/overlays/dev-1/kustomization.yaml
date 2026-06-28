@@ -1,0 +1,79 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-dev-1
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/spark-harness/fides-bff
+    digest: sha256:c43ff06fb434f688088a954e309a6b16ffc693b04c9ce3b8bb308dce663fb945
+replicas:
+  - name: fides-bff
+    count: 1
+labels:
+  - pairs:
+      lendora.io/environment: dev-1
+patches:
+  - target:
+      kind: ConfigMap
+      name: fides-bff-config
+    patch: |-
+      - op: replace
+        path: /data/config.yaml
+        value: |
+          server:
+            http:
+              network: tcp
+              addr: 0.0.0.0:8000
+            cors:
+              allowed_origins:
+                - https://dev-1-fides.fuzzytails.fun
+          applicant:
+            consul:
+              address: consul.lendora-shared-consul.svc.cluster.local:8500
+              scheme: http
+              service_name: dev-1-applicant-api
+            grpc:
+              timeout: 3s
+              plaintext: true
+          quote:
+            consul:
+              address: consul.lendora-shared-consul.svc.cluster.local:8500
+              scheme: http
+              service_name: dev-1-quote-api
+            http:
+              base_url: ""
+              timeout: 3s
+          origination:
+            consul:
+              address: consul.lendora-shared-consul.svc.cluster.local:8500
+              scheme: http
+              service_name: dev-1-origination-api
+            http:
+              base_url: ""
+              timeout: 3s
+          auth:
+            token_mode: hmac
+            access_token_ttl: 1h
+          registry:
+            consul:
+              enabled: true
+              address: consul.lendora-shared-consul.svc.cluster.local:8500
+              scheme: http
+              service_name: dev-1-fides-bff
+              discovery_addr: fides-bff.lendora-dev-1.svc.cluster.local:8000
+              heartbeat: true
+              health_check: true
+              health_check_interval_sec: 10
+              deregister_after_sec: 60
+              metadata:
+                module: frontend
+                environment: dev-1
+          observability:
+            otel:
+              enabled: false
+              exporter: otlp
+              endpoint: ""
+              protocol: http/protobuf
+              headers: {}
+              environment: dev-1
+              release: runtime

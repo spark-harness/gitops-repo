@@ -12,12 +12,8 @@ data:
     }
 
     github.fuzzytails.fun {
-        reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12000
-    }
-
-    api.fuzzytails.fun {
-        handle /api/v1* {
-            reverse_proxy fides-bff.lendora-sta-fides-bff.svc.cluster.local:8000
+        handle /gitops-repo {
+            reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12000
         }
         handle /harness-repo {
             reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12001
@@ -28,7 +24,20 @@ data:
         handle /idl-repo {
             reverse_proxy github-eventsource-svc.argo-events.svc.cluster.local:12003
         }
-        handle {
-            reverse_proxy fides.lendora-sta-fides.svc.cluster.local:3000
-        }
+    }
+
+    dev-1-api.fuzzytails.fun {
+        reverse_proxy fides-bff.lendora-dev-1.svc.cluster.local:8000
+    }
+
+    dev-1-fides.fuzzytails.fun {
+        reverse_proxy fides.lendora-dev-1.svc.cluster.local:3000
+    }
+
+    sta-1-api.fuzzytails.fun {
+        reverse_proxy fides-bff.lendora-sta-1.svc.cluster.local:8000
+    }
+
+    sta-1-fides.fuzzytails.fun {
+        reverse_proxy fides.lendora-sta-1.svc.cluster.local:3000
     }

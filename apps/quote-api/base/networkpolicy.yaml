@@ -32,7 +32,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: lendora-sta-consul
+              kubernetes.io/metadata.name: lendora-shared-consul
       ports:
         - protocol: TCP
           port: 8080

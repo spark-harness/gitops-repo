@@ -8,6 +8,9 @@
 
 ```text
 clusters/
+  lendora-shared/
+  lendora-dev-1/
+  lendora-sta-1/
   sta1/
   sta2/
   prod/
@@ -31,6 +34,9 @@ workflows/
 
 ## 环境入口
 
+- `clusters/lendora-shared/`：Lendora 共享 PostgreSQL、Redis、Consul 入口。
+- `clusters/lendora-dev-1/`：Lendora dev-1 业务环境入口，业务服务部署到 `lendora-dev-1`。
+- `clusters/lendora-sta-1/`：Lendora sta-1 业务环境入口，业务服务部署到 `lendora-sta-1`。
 - `clusters/sta1/`：STA1 集群入口，保存 STA1 namespace、AppProject 和 Argo CD Application 清单。
 - `clusters/sta2/`：STA2 集群入口，保存 STA2 namespace、AppProject 和 Argo CD Application 清单。
 - `clusters/prod/`：生产集群入口，保存生产 namespace、AppProject 和 Argo CD Application 清单。
