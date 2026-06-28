@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: lendora-dev-1
+  namespace: argocd
+spec:
+  description: Lendora dev-1 business environment.
+  sourceRepos:
+    - https://github.com/spark-harness/gitops-repo.git
+  destinations:
+    - namespace: lendora-dev-1
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

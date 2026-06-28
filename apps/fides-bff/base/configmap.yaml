@@ -13,28 +13,28 @@ data:
         addr: 0.0.0.0:8000
       cors:
         allowed_origins:
-          - https://api.fuzzytails.fun
+          - https://sta-1-fides.fuzzytails.fun
     applicant:
       consul:
-        address: consul.lendora-sta-consul.svc.cluster.local:8500
+        address: consul.lendora-shared-consul.svc.cluster.local:8500
         scheme: http
-        service_name: applicant-api
+        service_name: sta-1-applicant-api
       grpc:
         timeout: 3s
         plaintext: true
     quote:
       consul:
-        address: consul.lendora-sta-consul.svc.cluster.local:8500
+        address: consul.lendora-shared-consul.svc.cluster.local:8500
         scheme: http
-        service_name: quote-api
+        service_name: sta-1-quote-api
       http:
         base_url: ""
         timeout: 3s
     origination:
       consul:
-        address: consul.lendora-sta-consul.svc.cluster.local:8500
+        address: consul.lendora-shared-consul.svc.cluster.local:8500
         scheme: http
-        service_name: origination-api
+        service_name: sta-1-origination-api
       http:
         base_url: ""
         timeout: 3s
@@ -44,16 +44,17 @@ data:
     registry:
       consul:
         enabled: true
-        address: consul.lendora-sta-consul.svc.cluster.local:8500
+        address: consul.lendora-shared-consul.svc.cluster.local:8500
         scheme: http
-        discovery_addr: fides-bff.lendora-sta-fides-bff.svc.cluster.local:8000
+        service_name: sta-1-fides-bff
+        discovery_addr: fides-bff.lendora-sta-1.svc.cluster.local:8000
         heartbeat: true
         health_check: true
         health_check_interval_sec: 10
         deregister_after_sec: 60
         metadata:
           module: frontend
-          environment: sta
+          environment: sta-1
     observability:
       otel:
         enabled: false
@@ -61,5 +62,5 @@ data:
         endpoint: ""
         protocol: http/protobuf
         headers: {}
-        environment: sta
+        environment: sta-1
         release: runtime

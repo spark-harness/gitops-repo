@@ -1,0 +1,103 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-dev-1
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/spark-harness/origination-api
+    digest: sha256:94ea8d38c46341db044ede4ef6586e7cef96a2745d28fef2f114b5dd3d35880a
+replicas:
+  - name: origination-api
+    count: 1
+labels:
+  - pairs:
+      lendora.io/environment: dev-1
+patches:
+  - target:
+      kind: ConfigMap
+      name: origination-api-config
+    patch: |-
+      - op: replace
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: dev-1
+      - op: replace
+        path: /data/ORIGINATION_JDBC_URL
+        value: jdbc:postgresql://postgres.lendora-shared-postgres.svc.cluster.local:5432/dev_1_origination
+      - op: replace
+        path: /data/ORIGINATION_JDBC_USERNAME
+        value: dev_1_origination
+      - op: replace
+        path: /data/ORIGINATION_QUOTE_API_BASE_URL
+        value: http://quote-api.lendora-dev-1.svc.cluster.local
+      - op: replace
+        path: /data/SPARK_ORIGINATION_CONSUL_URL
+        value: http://consul.lendora-shared-consul.svc.cluster.local:8500
+      - op: replace
+        path: /data/SPARK_ORIGINATION_CONSUL_SERVICE_NAME
+        value: dev-1-origination-api
+      - op: replace
+        path: /data/SPARK_ORIGINATION_CONSUL_SERVICE_ADDRESS
+        value: origination-api.lendora-dev-1.svc.cluster.local
+      - op: replace
+        path: /data/SPARK_ORIGINATION_CONSUL_HEALTH_CHECK_URL
+        value: http://origination-api.lendora-dev-1.svc.cluster.local:80/ready
+  - target:
+      kind: ConfigMap
+      name: origination-api-consul-config
+    patch: |-
+      - op: replace
+        path: /data/origination-api.yml
+        value: |
+          spark:
+            origination:
+              quote-api-base-url: http://quote-api.lendora-dev-1.svc.cluster.local
+              quote-api-timeout: 3s
+              consul:
+                enabled: true
+                service-name: dev-1-origination-api
+                service-address: origination-api.lendora-dev-1.svc.cluster.local
+                http-port: 80
+                health-check-url: http://origination-api.lendora-dev-1.svc.cluster.local:80/ready
+          otel:
+            service:
+              name: origination-api
+            traces:
+              exporter: otlp
+              sampler: parentbased_traceidratio
+              sampler.arg: 0.1
+            exporter:
+              otlp:
+                traces:
+                  protocol: http/protobuf
+  - target:
+      kind: Job
+      name: origination-api-consul-config
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/command/2
+        value: |
+          curl --fail --request PUT --data-binary @/config/origination-api.yml \
+            http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/dev-1/origination-api/config
+  - target:
+      kind: NetworkPolicy
+      name: origination-api-ingress
+    patch: |-
+      - op: replace
+        path: /spec/ingress
+        value:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-dev-1
+            ports:
+              - protocol: TCP
+                port: 8080
+              - protocol: TCP
+                port: 80
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-shared-consul
+            ports:
+              - protocol: TCP
+                port: 8080

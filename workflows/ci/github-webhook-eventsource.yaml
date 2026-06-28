@@ -50,7 +50,7 @@ spec:
         endpoint: /harness-repo
         port: "12001"
         method: POST
-        url: https://api.fuzzytails.fun
+        url: https://github.fuzzytails.fun
       events:
         - pull_request
       apiToken:
@@ -71,7 +71,7 @@ spec:
         endpoint: /business-repo
         port: "12002"
         method: POST
-        url: https://api.fuzzytails.fun
+        url: https://github.fuzzytails.fun
       events:
         - pull_request
       apiToken:
@@ -92,7 +92,7 @@ spec:
         endpoint: /idl-repo
         port: "12003"
         method: POST
-        url: https://api.fuzzytails.fun
+        url: https://github.fuzzytails.fun
       events:
         - pull_request
         - push

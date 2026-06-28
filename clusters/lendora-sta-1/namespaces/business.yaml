@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lendora-sta-1
+  labels:
+    lendora.io/environment: "sta-1"
+    lendora.io/applicant-api-client: "true"
+    lendora.io/quote-api-client: "true"
+    lendora.io/origination-api-client: "true"

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lendora-dev-1
+  labels:
+    lendora.io/environment: "dev-1"
+    lendora.io/applicant-api-client: "true"
+    lendora.io/quote-api-client: "true"
+    lendora.io/origination-api-client: "true"

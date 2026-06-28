@@ -27,15 +27,15 @@ spec:
               containerPort: 3000
           env:
             - name: FIDES_RUNTIME_ENV
-              value: sta
+              value: sta-1
             - name: FIDES_RUNTIME_CONFIG_CONSUL_URL
-              value: http://consul.lendora-sta-consul.svc.cluster.local:8500
+              value: http://consul.lendora-shared-consul.svc.cluster.local:8500
             - name: FIDES_RUNTIME_CONFIG_CONSUL_KEY
-              value: spark/lendora/sta/fides-web/runtime-config
+              value: spark/lendora/sta-1/fides-web/runtime-config
             - name: FIDES_OTP_ADAPTER
               value: real
             - name: FIDES_BFF_BASE_URL
-              value: /api/v1
+              value: https://sta-1-api.fuzzytails.fun/api/v1
           readinessProbe:
             httpGet:
               path: /

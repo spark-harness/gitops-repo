@@ -1,0 +1,114 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lendora-dev-1
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/spark-harness/applicant-api
+    digest: sha256:70b3a3f5c0179b11a8171e7bbdb254020f29e6c1471a93a70827776c50504ff3
+replicas:
+  - name: applicant-api
+    count: 1
+labels:
+  - pairs:
+      lendora.io/environment: dev-1
+patches:
+  - target:
+      kind: ConfigMap
+      name: applicant-api-config
+    patch: |-
+      - op: replace
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: dev-1
+      - op: replace
+        path: /data/SPARK_APPLICANT_AUTH_JDBC_URL
+        value: jdbc:postgresql://postgres.lendora-shared-postgres.svc.cluster.local:5432/dev_1_applicant
+      - op: replace
+        path: /data/SPARK_APPLICANT_AUTH_JDBC_USERNAME
+        value: dev_1_applicant
+      - op: replace
+        path: /data/SPRING_DATA_REDIS_HOST
+        value: redis.lendora-shared-redis.svc.cluster.local
+      - op: add
+        path: /data/SPRING_DATA_REDIS_DATABASE
+        value: "1"
+      - op: replace
+        path: /data/SPARK_APPLICANT_AUTH_CONSUL_URL
+        value: http://consul.lendora-shared-consul.svc.cluster.local:8500
+      - op: add
+        path: /data/SPARK_APPLICANT_AUTH_CONSUL_SERVICE_NAME
+        value: dev-1-applicant-api
+      - op: replace
+        path: /data/SPARK_APPLICANT_AUTH_CONSUL_SERVICE_ADDRESS
+        value: applicant-api.lendora-dev-1.svc.cluster.local
+      - op: replace
+        path: /data/SPARK_APPLICANT_AUTH_CONSUL_HEALTH_CHECK_URL
+        value: http://applicant-api.lendora-dev-1.svc.cluster.local:80/ready
+  - target:
+      kind: ConfigMap
+      name: applicant-api-consul-config
+    patch: |-
+      - op: replace
+        path: /data/applicant-api.yml
+        value: |
+          spark:
+            applicant:
+              auth:
+                runtime-store: redis-jdbc
+                otp-provider: test
+                token-mode: hmac
+                migrations-enabled: false
+                jdbc-url: jdbc:postgresql://postgres.lendora-shared-postgres.svc.cluster.local:5432/dev_1_applicant
+                jdbc-username: dev_1_applicant
+                consul:
+                  enabled: true
+                  service-name: dev-1-applicant-api
+                  health-check-path: /ready
+          spring:
+            data:
+              redis:
+                host: redis.lendora-shared-redis.svc.cluster.local
+                database: 1
+          otel:
+            traces:
+              exporter: otlp
+              sampler: parentbased_traceidratio
+              sampler.arg: 0.1
+            exporter:
+              otlp:
+                traces:
+                  protocol: http/protobuf
+  - target:
+      kind: Job
+      name: applicant-api-consul-config
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/command/2
+        value: |
+          curl --fail --request PUT --data-binary @/config/applicant-api.yml \
+            http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/dev-1/applicant-api/config
+  - target:
+      kind: NetworkPolicy
+      name: applicant-api-ingress
+    patch: |-
+      - op: replace
+        path: /spec/ingress
+        value:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-dev-1
+            ports:
+              - protocol: TCP
+                port: 9090
+              - protocol: TCP
+                port: 8080
+              - protocol: TCP
+                port: 80
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-shared-consul
+            ports:
+              - protocol: TCP
+                port: 8080

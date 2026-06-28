@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: applicant-postgres-init
+  labels:
+    app.kubernetes.io/name: applicant-postgres-init
+    app.kubernetes.io/part-of: lendora
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: applicant-postgres-init
+        app.kubernetes.io/part-of: lendora
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: applicant-postgres-init
+          image: postgres:16.6
+          env:
+            - name: PGHOST
+              value: postgres.lendora-shared-postgres.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: APPLICANT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: applicant-api-runtime
+                  key: db-password
+          command:
+            - sh
+            - -ceu
+            - |
+              psql -d postgres -v ON_ERROR_STOP=1 -v applicant_password="${APPLICANT_DB_PASSWORD}" <<SQL
+              SELECT format('CREATE ROLE dev_1_applicant LOGIN PASSWORD %L', :'applicant_password')
+              WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dev_1_applicant')\gexec
+              SELECT 'CREATE DATABASE dev_1_applicant OWNER dev_1_applicant'
+              WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'dev_1_applicant')\gexec
+              SELECT format('CREATE ROLE sta_1_applicant LOGIN PASSWORD %L', :'applicant_password')
+              WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sta_1_applicant')\gexec
+              SELECT 'CREATE DATABASE sta_1_applicant OWNER sta_1_applicant'
+              WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'sta_1_applicant')\gexec
+              SQL

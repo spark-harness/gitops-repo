@@ -1,0 +1,124 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+labels:
+  - pairs:
+      lendora.io/environment: shared
+patches:
+  - target:
+      kind: Deployment
+      name: postgres
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-postgres
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgres-data
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-postgres
+  - target:
+      kind: Service
+      name: postgres
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-postgres
+  - target:
+      kind: Job
+      name: applicant-postgres-init
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-postgres
+  - target:
+      kind: Job
+      name: quote-postgres-init
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-postgres
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: postgres.lendora-shared-postgres.svc.cluster.local
+      - op: replace
+        path: /spec/template/spec/containers/0/command/2
+        value: |
+          psql -d postgres -v ON_ERROR_STOP=1 -v quote_password="${QUOTE_DB_PASSWORD}" <<SQL
+          SELECT format('CREATE ROLE dev_1_quote LOGIN PASSWORD %L', :'quote_password')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dev_1_quote')\gexec
+          SELECT 'CREATE DATABASE dev_1_quote OWNER dev_1_quote'
+          WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'dev_1_quote')\gexec
+          SELECT format('CREATE ROLE sta_1_quote LOGIN PASSWORD %L', :'quote_password')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sta_1_quote')\gexec
+          SELECT 'CREATE DATABASE sta_1_quote OWNER sta_1_quote'
+          WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'sta_1_quote')\gexec
+          SQL
+  - target:
+      kind: Job
+      name: origination-postgres-init
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-postgres
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: postgres.lendora-shared-postgres.svc.cluster.local
+      - op: replace
+        path: /spec/template/spec/containers/0/command/2
+        value: |
+          psql -d postgres -v ON_ERROR_STOP=1 -v origination_password="${ORIGINATION_DB_PASSWORD}" <<SQL
+          SELECT format('CREATE ROLE dev_1_origination LOGIN PASSWORD %L', :'origination_password')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dev_1_origination')\gexec
+          SELECT 'CREATE DATABASE dev_1_origination OWNER dev_1_origination'
+          WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'dev_1_origination')\gexec
+          SELECT format('CREATE ROLE sta_1_origination LOGIN PASSWORD %L', :'origination_password')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sta_1_origination')\gexec
+          SELECT 'CREATE DATABASE sta_1_origination OWNER sta_1_origination'
+          WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'sta_1_origination')\gexec
+          SQL
+  - target:
+      kind: Deployment
+      name: redis
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-redis
+  - target:
+      kind: PersistentVolumeClaim
+      name: redis-data
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-redis
+  - target:
+      kind: Service
+      name: redis
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-redis
+  - target:
+      kind: Deployment
+      name: consul
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-consul
+  - target:
+      kind: PersistentVolumeClaim
+      name: consul-data
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-consul
+  - target:
+      kind: Service
+      name: consul
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: lendora-shared-consul

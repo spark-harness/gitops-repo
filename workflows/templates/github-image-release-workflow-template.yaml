@@ -326,27 +326,27 @@ spec:
             root = Path("/workspace/gitops")
             releases = [
                 {
-                    "overlay": "apps/applicant-api/overlays/lendora-sta/kustomization.yaml",
+                    "overlay": "apps/applicant-api/overlays/dev-1/kustomization.yaml",
                     "image": "ghcr.io/spark-harness/applicant-api",
                     "digest": Path("/workspace/images/applicant-api/digest").read_text(encoding="utf-8").strip(),
                 },
                 {
-                    "overlay": "apps/fides-bff/overlays/lendora-sta/kustomization.yaml",
+                    "overlay": "apps/fides-bff/overlays/dev-1/kustomization.yaml",
                     "image": "ghcr.io/spark-harness/fides-bff",
                     "digest": Path("/workspace/images/fides-bff/digest").read_text(encoding="utf-8").strip(),
                 },
                 {
-                    "overlay": "apps/fides/overlays/lendora-sta/kustomization.yaml",
+                    "overlay": "apps/fides/overlays/dev-1/kustomization.yaml",
                     "image": "ghcr.io/spark-harness/fides",
                     "digest": Path("/workspace/images/fides/digest").read_text(encoding="utf-8").strip(),
                 },
                 {
-                    "overlay": "apps/quote-api/overlays/lendora-sta/kustomization.yaml",
+                    "overlay": "apps/quote-api/overlays/dev-1/kustomization.yaml",
                     "image": "ghcr.io/spark-harness/quote-api",
                     "digest": Path("/workspace/images/quote-api/digest").read_text(encoding="utf-8").strip(),
                 },
                 {
-                    "overlay": "apps/origination-api/overlays/lendora-sta/kustomization.yaml",
+                    "overlay": "apps/origination-api/overlays/dev-1/kustomization.yaml",
                     "image": "ghcr.io/spark-harness/origination-api",
                     "digest": Path("/workspace/images/origination-api/digest").read_text(encoding="utf-8").strip(),
                 },
@@ -377,12 +377,12 @@ spec:
           - -ceu
         args:
           - |
-            kubectl kustomize /workspace/gitops/apps/applicant-api/overlays/lendora-sta >/tmp/applicant-api.yaml
-            kubectl kustomize /workspace/gitops/apps/fides-bff/overlays/lendora-sta >/tmp/fides-bff.yaml
-            kubectl kustomize /workspace/gitops/apps/fides/overlays/lendora-sta >/tmp/fides.yaml
-            kubectl kustomize /workspace/gitops/apps/quote-api/overlays/lendora-sta >/tmp/quote-api.yaml
-            kubectl kustomize /workspace/gitops/apps/origination-api/overlays/lendora-sta >/tmp/origination-api.yaml
-            kubectl kustomize /workspace/gitops/clusters/lendora-sta >/tmp/lendora-sta.yaml
+            kubectl kustomize /workspace/gitops/apps/applicant-api/overlays/dev-1 >/tmp/applicant-api.yaml
+            kubectl kustomize /workspace/gitops/apps/fides-bff/overlays/dev-1 >/tmp/fides-bff.yaml
+            kubectl kustomize /workspace/gitops/apps/fides/overlays/dev-1 >/tmp/fides.yaml
+            kubectl kustomize /workspace/gitops/apps/quote-api/overlays/dev-1 >/tmp/quote-api.yaml
+            kubectl kustomize /workspace/gitops/apps/origination-api/overlays/dev-1 >/tmp/origination-api.yaml
+            kubectl kustomize /workspace/gitops/clusters/lendora-dev-1 >/tmp/lendora-dev-1.yaml
         volumeMounts:
           - name: workspace
             mountPath: /workspace
@@ -406,11 +406,11 @@ spec:
             git config user.email "spark-argo@users.noreply.github.com"
             git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/{{workflow.parameters.gitops-repo}}.git"
             git add \
-              apps/applicant-api/overlays/lendora-sta/kustomization.yaml \
-              apps/fides-bff/overlays/lendora-sta/kustomization.yaml \
-              apps/fides/overlays/lendora-sta/kustomization.yaml \
-              apps/quote-api/overlays/lendora-sta/kustomization.yaml \
-              apps/origination-api/overlays/lendora-sta/kustomization.yaml
+              apps/applicant-api/overlays/dev-1/kustomization.yaml \
+              apps/fides-bff/overlays/dev-1/kustomization.yaml \
+              apps/fides/overlays/dev-1/kustomization.yaml \
+              apps/quote-api/overlays/dev-1/kustomization.yaml \
+              apps/origination-api/overlays/dev-1/kustomization.yaml
             git diff --staged --quiet && exit 0
             git commit -m "chore(gitops): promote business images {{workflow.parameters.commit-sha}}"
             git push origin HEAD:"{{workflow.parameters.gitops-branch}}"
