@@ -2,31 +2,24 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: lendora-dev-1
 resources:
-  - ../../base
-  - runtime-config-consul.yaml
+- ../../base
+- runtime-config-consul.yaml
 images:
-  - name: ghcr.io/spark-harness/fides
-    digest: sha256:37212ca4e5a028dbc41c707aa214f2fd8955f77ecf0e8de98cc98a2e2fb98c8f
+- name: ghcr.io/spark-harness/fides
+  digest: sha256:62f0d59ac32a42627d6f447fe64565f2a18890fd8fafc90a30e5ab7570a091b8
 replicas:
-  - name: fides
-    count: 1
+- name: fides
+  count: 1
 labels:
-  - pairs:
-      lendora.io/environment: dev-1
+- pairs:
+    lendora.io/environment: dev-1
 patches:
-  - target:
-      kind: Deployment
-      name: fides
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/0/value
-        value: dev-1
-      - op: replace
-        path: /spec/template/spec/containers/0/env/1/value
-        value: http://consul.lendora-shared-consul.svc.cluster.local:8500
-      - op: replace
-        path: /spec/template/spec/containers/0/env/2/value
-        value: spark/lendora/dev-1/fides-web/runtime-config
-      - op: replace
-        path: /spec/template/spec/containers/0/env/4/value
-        value: https://dev-1-api.fuzzytails.fun/api/v1
+- target:
+    kind: Deployment
+    name: fides
+  patch: "- op: replace\n  path: /spec/template/spec/containers/0/env/0/value\n  value:\
+    \ dev-1\n- op: replace\n  path: /spec/template/spec/containers/0/env/1/value\n\
+    \  value: http://consul.lendora-shared-consul.svc.cluster.local:8500\n- op: replace\n\
+    \  path: /spec/template/spec/containers/0/env/2/value\n  value: spark/lendora/dev-1/fides-web/runtime-config\n\
+    - op: replace\n  path: /spec/template/spec/containers/0/env/4/value\n  value:\
+    \ https://dev-1-api.fuzzytails.fun/api/v1"
