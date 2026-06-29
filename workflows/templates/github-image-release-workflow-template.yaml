@@ -41,7 +41,7 @@ spec:
       - name: python-image
         value: python:3.13-bookworm
       - name: kubectl-image
-        value: bitnami/kubectl:1.31
+        value: registry.k8s.io/kubectl:v1.31.13
   templates:
     - name: run
       dag:
