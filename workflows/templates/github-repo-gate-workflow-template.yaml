@@ -301,6 +301,10 @@ spec:
               echo "No requirement id found in head ref; skipping delivery readiness."
               exit 0
             fi
+            if [ ! -f "/workspace/harness-repo/requirements/${requirement_id}/requirement.md" ]; then
+              echo "No Harness requirement found for ${requirement_id}; skipping delivery readiness."
+              exit 0
+            fi
             janus delivery verify \
               --workspace /workspace \
               --requirement "${requirement_id}" \
