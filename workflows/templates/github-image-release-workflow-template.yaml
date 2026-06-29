@@ -371,19 +371,55 @@ spec:
             mountPath: /workspace
 
     - name: validate-gitops-render
+      steps:
+        - - name: applicant-api
+            template: kustomize-render
+            arguments:
+              parameters:
+                - name: overlay
+                  value: apps/applicant-api/overlays/dev-1
+        - - name: fides-bff
+            template: kustomize-render
+            arguments:
+              parameters:
+                - name: overlay
+                  value: apps/fides-bff/overlays/dev-1
+        - - name: fides
+            template: kustomize-render
+            arguments:
+              parameters:
+                - name: overlay
+                  value: apps/fides/overlays/dev-1
+        - - name: quote-api
+            template: kustomize-render
+            arguments:
+              parameters:
+                - name: overlay
+                  value: apps/quote-api/overlays/dev-1
+        - - name: origination-api
+            template: kustomize-render
+            arguments:
+              parameters:
+                - name: overlay
+                  value: apps/origination-api/overlays/dev-1
+        - - name: cluster
+            template: kustomize-render
+            arguments:
+              parameters:
+                - name: overlay
+                  value: clusters/lendora-dev-1
+
+    - name: kustomize-render
+      inputs:
+        parameters:
+          - name: overlay
       container:
         image: "{{workflow.parameters.kubectl-image}}"
         command:
-          - sh
-          - -ceu
+          - kubectl
         args:
-          - |
-            kubectl kustomize /workspace/gitops/apps/applicant-api/overlays/dev-1 >/tmp/applicant-api.yaml
-            kubectl kustomize /workspace/gitops/apps/fides-bff/overlays/dev-1 >/tmp/fides-bff.yaml
-            kubectl kustomize /workspace/gitops/apps/fides/overlays/dev-1 >/tmp/fides.yaml
-            kubectl kustomize /workspace/gitops/apps/quote-api/overlays/dev-1 >/tmp/quote-api.yaml
-            kubectl kustomize /workspace/gitops/apps/origination-api/overlays/dev-1 >/tmp/origination-api.yaml
-            kubectl kustomize /workspace/gitops/clusters/lendora-dev-1 >/tmp/lendora-dev-1.yaml
+          - kustomize
+          - /workspace/gitops/{{inputs.parameters.overlay}}
         volumeMounts:
           - name: workspace
             mountPath: /workspace
