@@ -10,7 +10,7 @@
 
 它不是什么：它不是业务仓构建脚本，也不保存 registry 密钥或生产凭据。
 
-它是什么：它定义 Argo CI 在收到 `business-repo` 主干 push 后如何取源码，并行构建和扫描 `applicant-api`、`fides-bff`、`fides` 三个镜像，回写 GitHub 状态，并把 GitOps 环境 overlay 一次性更新到不可变 digest。
+它是什么：它定义 Argo CI 在收到 `business-repo` 主干 push 后如何取源码，受控构建和扫描 `applicant-api`、`fides-bff`、`fides`、`quote-api`、`origination-api` 五个镜像，回写 GitHub 状态，并把 GitOps 环境 overlay 一次性更新到不可变 digest。
 
 ### 构建器选择
 
@@ -18,11 +18,13 @@
 
 BuildKit 以 `moby/buildkit:rootless` 运行 `buildctl-daemonless.sh`，当前模板在 Kubernetes 中保留 `privileged: true`，后续如果集群启用更严格的 rootless builder 节点池，再收紧这项运行时权限。
 
+模板设置 `parallelism: 1`，避免单节点 dev-1 同时运行多个 Maven、Next、Go 和 Trivy 任务导致 kube-apiserver 失去响应。
+
 ### Tag 和 digest
 
 - 主干构建推送 tag：`sha-<short-sha>`。
 - 环境部署只引用 digest：`<image>@sha256:<digest>`。
-- GitOps overlay 的 image 更新在三镜像扫描通过后统一提交，避免每个镜像各自 push。
+- GitOps overlay 的 image 更新在五个镜像扫描通过后统一提交，避免每个镜像各自 push。
 
 ### Secret 引用
 

@@ -33,7 +33,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: business-repo-image-release-
+                name: business-image-release
                 namespace: argo
               spec:
                 workflowTemplateRef:
@@ -58,3 +58,7 @@ spec:
                 dependencyName: business-repo-master-push
                 dataKey: body.after
               dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: business-repo-master-push
+                dataTemplate: "business-image-release-{{ .Input.body.after | substr 0 12 }}"
+              dest: metadata.name

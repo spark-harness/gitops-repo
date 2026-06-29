@@ -5,6 +5,7 @@ metadata:
   namespace: argo
 spec:
   entrypoint: run
+  parallelism: 1
   serviceAccountName: argo
   onExit: report-failure
   volumeClaimTemplates:
