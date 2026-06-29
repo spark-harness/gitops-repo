@@ -25,7 +25,8 @@ patches:
     - op: add\n  path: /data/SPARK_APPLICANT_AUTH_CONSUL_SERVICE_NAME\n  value: dev-1-applicant-api\n\
     - op: replace\n  path: /data/SPARK_APPLICANT_AUTH_CONSUL_SERVICE_ADDRESS\n  value:\
     \ applicant-api.lendora-dev-1.svc.cluster.local\n- op: replace\n  path: /data/SPARK_APPLICANT_AUTH_CONSUL_HEALTH_CHECK_URL\n\
-    \  value: http://applicant-api.lendora-dev-1.svc.cluster.local:80/ready"
+    \  value: http://applicant-api.lendora-dev-1.svc.cluster.local:80/ready\n- op: replace\n\
+    \  path: /data/OTEL_TRACES_EXPORTER\n  value: none"
 - target:
     kind: ConfigMap
     name: applicant-api-consul-config
@@ -36,7 +37,7 @@ patches:
     \          jdbc-username: dev_1_applicant\n          consul:\n            enabled:\
     \ true\n            service-name: dev-1-applicant-api\n            health-check-path:\
     \ /ready\n    spring:\n      data:\n        redis:\n          host: redis.lendora-shared-redis.svc.cluster.local\n\
-    \          database: 1\n    otel:\n      traces:\n        exporter: otlp\n   \
+    \          database: 1\n    otel:\n      traces:\n        exporter: none\n   \
     \     sampler: parentbased_traceidratio\n        sampler.arg: 0.1\n      exporter:\n\
     \        otlp:\n          traces:\n            protocol: http/protobuf"
 - target:
