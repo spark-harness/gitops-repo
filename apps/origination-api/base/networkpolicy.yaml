@@ -29,6 +29,8 @@ spec:
           port: 8080
         - protocol: TCP
           port: 80
+        - protocol: TCP
+          port: 9090
     - from:
         - namespaceSelector:
             matchLabels:
@@ -36,3 +38,5 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+        - protocol: TCP
+          port: 9090
