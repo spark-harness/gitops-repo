@@ -8,7 +8,7 @@ images:
     digest: sha256:70b3a3f5c0179b11a8171e7bbdb254020f29e6c1471a93a70827776c50504ff3
 replicas:
   - name: applicant-api
-    count: 1
+    count: 0
 labels:
   - pairs:
       lendora.io/environment: sta-1

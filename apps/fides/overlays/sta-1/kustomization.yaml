@@ -9,7 +9,7 @@ images:
     digest: sha256:37212ca4e5a028dbc41c707aa214f2fd8955f77ecf0e8de98cc98a2e2fb98c8f
 replicas:
   - name: fides
-    count: 1
+    count: 0
 labels:
   - pairs:
       lendora.io/environment: sta-1

@@ -8,7 +8,7 @@ images:
     digest: sha256:6360e0c2625fc0226dcba1b8bc263115ee9b1fed2ffcd3ad8011eac489f34249
 replicas:
   - name: origination-api
-    count: 1
+    count: 0
 labels:
   - pairs:
       lendora.io/environment: sta-1
