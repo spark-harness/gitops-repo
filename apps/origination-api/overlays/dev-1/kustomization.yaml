@@ -91,6 +91,7 @@ patches:
         endpoint="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*endpoint:[[:space:]]*//p' | tail -n 1)"
         headers="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*headers:[[:space:]]*//p' | tail -n 1)"
         cp /config/origination-api.yml /tmp/origination-api.yml
+        printf '\n' >> /tmp/origination-api.yml
         if [ -n "$endpoint" ]; then
           printf '            endpoint: %s\n' "$endpoint" >> /tmp/origination-api.yml
         fi

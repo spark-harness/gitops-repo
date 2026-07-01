@@ -77,6 +77,7 @@ patches:
           endpoint="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*endpoint:[[:space:]]*//p' | tail -n 1)"
           headers="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*headers:[[:space:]]*//p' | tail -n 1)"
           cp /config/quote-api.yml /tmp/quote-api.yml
+          printf '\n' >> /tmp/quote-api.yml
           if [ -n "$endpoint" ]; then
             printf '            endpoint: %s\n' "$endpoint" >> /tmp/quote-api.yml
           fi
