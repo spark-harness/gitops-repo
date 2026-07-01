@@ -5,7 +5,7 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/spark-harness/quote-api
-    digest: sha256:caa13ee0036295c3b23121830eb6aa0d590e9f8c7821de6a2c0092bb83f2385d
+    digest: sha256:5a23f8ad63edcd9946b2df249a769ee9eeed210c6fe8b84929dba1216036f279
 replicas:
   - name: quote-api
     count: 1

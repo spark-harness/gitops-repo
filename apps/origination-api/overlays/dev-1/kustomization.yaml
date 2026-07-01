@@ -5,7 +5,7 @@ resources:
 - ../../base
 images:
 - name: ghcr.io/spark-harness/origination-api
-  digest: sha256:183f229a4a8f05cbb430f219e8b9d149a79dcbaf9c85d7fbb1c1c278c88f578e
+  digest: sha256:6360e0c2625fc0226dcba1b8bc263115ee9b1fed2ffcd3ad8011eac489f34249
 replicas:
 - name: origination-api
   count: 1
