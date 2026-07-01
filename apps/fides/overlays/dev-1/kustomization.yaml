@@ -6,7 +6,7 @@ resources:
 - runtime-config-consul.yaml
 images:
 - name: ghcr.io/spark-harness/fides
-  digest: sha256:62f0d59ac32a42627d6f447fe64565f2a18890fd8fafc90a30e5ab7570a091b8
+  digest: sha256:dbfc66fef1f442a48d395a0b0334675774fe6d437822eb4c00d72e002526f7fa
 replicas:
 - name: fides
   count: 1
