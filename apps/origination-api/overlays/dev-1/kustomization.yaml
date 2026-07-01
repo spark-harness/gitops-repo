@@ -5,7 +5,7 @@ resources:
 - ../../base
 images:
 - name: ghcr.io/spark-harness/origination-api
-  digest: sha256:183f229a4a8f05cbb430f219e8b9d149a79dcbaf9c85d7fbb1c1c278c88f578e
+  digest: sha256:6360e0c2625fc0226dcba1b8bc263115ee9b1fed2ffcd3ad8011eac489f34249
 replicas:
 - name: origination-api
   count: 1
@@ -44,6 +44,12 @@ patches:
     - op: add
       path: /data/SPARK_ORIGINATION_CONSUL_GRPC_PORT
       value: "9090"
+    - op: replace
+      path: /data/SPRING_CLOUD_CONSUL_CONFIG_PREFIX
+      value: spark/lendora/dev-1
+    - op: replace
+      path: /data/OTEL_RESOURCE_ATTRIBUTES
+      value: deployment.environment=dev-1
 - target:
     kind: ConfigMap
     name: origination-api-consul-config
@@ -76,9 +82,22 @@ patches:
 - target:
     kind: Job
     name: origination-api-consul-config
-  patch: "- op: replace\n  path: /spec/template/spec/containers/0/command/2\n  value:\
-    \ |\n    curl --fail --request PUT --data-binary @/config/origination-api.yml\
-    \ \\\n      http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/dev-1/origination-api/config"
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/command/2
+      value: |
+        key_url="http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/dev-1/origination-api/config"
+        existing="$(curl --fail --silent "${key_url}?raw" || true)"
+        endpoint="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*endpoint:[[:space:]]*//p' | tail -n 1)"
+        headers="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*headers:[[:space:]]*//p' | tail -n 1)"
+        cp /config/origination-api.yml /tmp/origination-api.yml
+        if [ -n "$endpoint" ]; then
+          printf '            endpoint: %s\n' "$endpoint" >> /tmp/origination-api.yml
+        fi
+        if [ -n "$headers" ]; then
+          printf '            headers: %s\n' "$headers" >> /tmp/origination-api.yml
+        fi
+        curl --fail --request PUT --data-binary @/tmp/origination-api.yml "$key_url"
 - target:
     kind: NetworkPolicy
     name: origination-api-ingress
