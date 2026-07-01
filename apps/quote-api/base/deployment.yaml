@@ -35,11 +35,6 @@ spec:
                 secretKeyRef:
                   name: quote-api-runtime
                   key: db-password
-            - name: OTEL_EXPORTER_OTLP_TRACES_HEADERS
-              valueFrom:
-                secretKeyRef:
-                  name: quote-api-runtime
-                  key: otlp-traces-headers
           readinessProbe:
             httpGet:
               path: /ready

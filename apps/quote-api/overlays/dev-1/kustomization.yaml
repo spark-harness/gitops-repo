@@ -2,49 +2,114 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: lendora-dev-1
 resources:
-- ../../base
+  - ../../base
 images:
-- name: ghcr.io/spark-harness/quote-api
-  digest: sha256:caa13ee0036295c3b23121830eb6aa0d590e9f8c7821de6a2c0092bb83f2385d
+  - name: ghcr.io/spark-harness/quote-api
+    digest: sha256:caa13ee0036295c3b23121830eb6aa0d590e9f8c7821de6a2c0092bb83f2385d
 replicas:
-- name: quote-api
-  count: 1
+  - name: quote-api
+    count: 1
 labels:
-- pairs:
-    lendora.io/environment: dev-1
+  - pairs:
+      lendora.io/environment: dev-1
 patches:
-- target:
-    kind: ConfigMap
-    name: quote-api-config
-  patch: "- op: replace\n  path: /data/SPRING_PROFILES_ACTIVE\n  value: dev-1\n- op:\
-    \ replace\n  path: /data/QUOTE_JDBC_URL\n  value: jdbc:postgresql://postgres.lendora-shared-postgres.svc.cluster.local:5432/dev_1_quote\n\
-    - op: replace\n  path: /data/QUOTE_JDBC_USERNAME\n  value: dev_1_quote\n- op:\
-    \ replace\n  path: /data/SPARK_QUOTE_CONSUL_URL\n  value: http://consul.lendora-shared-consul.svc.cluster.local:8500\n\
-    - op: replace\n  path: /data/SPARK_QUOTE_CONSUL_SERVICE_NAME\n  value: dev-1-quote-api\n\
-    - op: replace\n  path: /data/SPARK_QUOTE_CONSUL_SERVICE_ADDRESS\n  value: quote-api.lendora-dev-1.svc.cluster.local\n\
-    - op: replace\n  path: /data/SPARK_QUOTE_CONSUL_HEALTH_CHECK_URL\n  value: http://quote-api.lendora-dev-1.svc.cluster.local:80/ready"
-- target:
-    kind: ConfigMap
-    name: quote-api-consul-config
-  patch: "- op: replace\n  path: /data/quote-api.yml\n  value: |\n    spark:\n   \
-    \   quote:\n        validity: 30m\n        consul:\n          enabled: true\n\
-    \          service-name: dev-1-quote-api\n          service-address: quote-api.lendora-dev-1.svc.cluster.local\n\
-    \          http-port: 80\n          health-check-url: http://quote-api.lendora-dev-1.svc.cluster.local:80/ready\n\
-    \    otel:\n      service:\n        name: quote-api\n      traces:\n        exporter:\
-    \ otlp\n        sampler: parentbased_traceidratio\n        sampler.arg: 0.1\n\
-    \      exporter:\n        otlp:\n          traces:\n            protocol: http/protobuf"
-- target:
-    kind: Job
-    name: quote-api-consul-config
-  patch: "- op: replace\n  path: /spec/template/spec/containers/0/command/2\n  value:\
-    \ |\n    curl --fail --request PUT --data-binary @/config/quote-api.yml \\\n \
-    \     http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/dev-1/quote-api/config"
-- target:
-    kind: NetworkPolicy
-    name: quote-api-ingress
-  patch: "- op: replace\n  path: /spec/ingress\n  value:\n    - from:\n        - namespaceSelector:\n\
-    \            matchLabels:\n              kubernetes.io/metadata.name: lendora-dev-1\n\
-    \      ports:\n        - protocol: TCP\n          port: 8080\n        - protocol:\
-    \ TCP\n          port: 80\n    - from:\n        - namespaceSelector:\n       \
-    \     matchLabels:\n              kubernetes.io/metadata.name: lendora-shared-consul\n\
-    \      ports:\n        - protocol: TCP\n          port: 8080"
+  - target:
+      kind: ConfigMap
+      name: quote-api-config
+    patch: |-
+      - op: replace
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: dev-1
+      - op: replace
+        path: /data/QUOTE_JDBC_URL
+        value: jdbc:postgresql://postgres.lendora-shared-postgres.svc.cluster.local:5432/dev_1_quote
+      - op: replace
+        path: /data/QUOTE_JDBC_USERNAME
+        value: dev_1_quote
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_URL
+        value: http://consul.lendora-shared-consul.svc.cluster.local:8500
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_SERVICE_NAME
+        value: dev-1-quote-api
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_SERVICE_ADDRESS
+        value: quote-api.lendora-dev-1.svc.cluster.local
+      - op: replace
+        path: /data/SPARK_QUOTE_CONSUL_HEALTH_CHECK_URL
+        value: http://quote-api.lendora-dev-1.svc.cluster.local:80/ready
+      - op: replace
+        path: /data/SPRING_CLOUD_CONSUL_CONFIG_PREFIX
+        value: spark/lendora/dev-1
+      - op: replace
+        path: /data/OTEL_RESOURCE_ATTRIBUTES
+        value: deployment.environment=dev-1
+  - target:
+      kind: ConfigMap
+      name: quote-api-consul-config
+    patch: |-
+      - op: replace
+        path: /data/quote-api.yml
+        value: |
+          spark:
+            quote:
+              validity: 30m
+              consul:
+                enabled: true
+                service-name: dev-1-quote-api
+                service-address: quote-api.lendora-dev-1.svc.cluster.local
+                http-port: 80
+                health-check-url: http://quote-api.lendora-dev-1.svc.cluster.local:80/ready
+          otel:
+            service:
+              name: quote-api
+            traces:
+              exporter: otlp
+              sampler: parentbased_traceidratio
+              sampler.arg: 0.1
+            exporter:
+              otlp:
+                traces:
+                  protocol: http/protobuf
+  - target:
+      kind: Job
+      name: quote-api-consul-config
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/command/2
+        value: |
+          key_url="http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/dev-1/quote-api/config"
+          existing="$(curl --fail --silent "${key_url}?raw" || true)"
+          endpoint="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*endpoint:[[:space:]]*//p' | tail -n 1)"
+          headers="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*headers:[[:space:]]*//p' | tail -n 1)"
+          cp /config/quote-api.yml /tmp/quote-api.yml
+          if [ -n "$endpoint" ]; then
+            printf '            endpoint: %s\n' "$endpoint" >> /tmp/quote-api.yml
+          fi
+          if [ -n "$headers" ]; then
+            printf '            headers: %s\n' "$headers" >> /tmp/quote-api.yml
+          fi
+          curl --fail --request PUT --data-binary @/tmp/quote-api.yml "$key_url"
+  - target:
+      kind: NetworkPolicy
+      name: quote-api-ingress
+    patch: |-
+      - op: replace
+        path: /spec/ingress
+        value:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-dev-1
+            ports:
+              - protocol: TCP
+                port: 8080
+              - protocol: TCP
+                port: 80
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: lendora-shared-consul
+            ports:
+              - protocol: TCP
+                port: 8080

@@ -16,5 +16,10 @@ data:
   SPARK_QUOTE_CONSUL_SERVICE_ADDRESS: quote-api.lendora-sta-1.svc.cluster.local
   SPARK_QUOTE_CONSUL_HTTP_PORT: "80"
   SPARK_QUOTE_CONSUL_HEALTH_CHECK_URL: http://quote-api.lendora-sta-1.svc.cluster.local:80/ready
+  SPRING_CLOUD_CONSUL_ENABLED: "true"
+  SPRING_CLOUD_CONSUL_HOST: consul.lendora-shared-consul.svc.cluster.local
+  SPRING_CLOUD_CONSUL_PORT: "8500"
+  SPRING_CLOUD_CONSUL_CONFIG_ENABLED: "true"
+  SPRING_CLOUD_CONSUL_CONFIG_PREFIX: spark/lendora/sta-1
   OTEL_TRACES_EXPORTER: otlp
-  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ""
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=sta-1

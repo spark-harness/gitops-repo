@@ -76,8 +76,18 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/command/2
         value: |
-          curl --fail --request PUT --data-binary @/config/origination-api.yml \
-            http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/sta-1/origination-api/config
+          key_url="http://consul.lendora-shared-consul.svc.cluster.local:8500/v1/kv/spark/lendora/sta-1/origination-api/config"
+          existing="$(curl --fail --silent "${key_url}?raw" || true)"
+          endpoint="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*endpoint:[[:space:]]*//p' | tail -n 1)"
+          headers="$(printf '%s\n' "$existing" | sed -n 's/^[[:space:]]*headers:[[:space:]]*//p' | tail -n 1)"
+          cp /config/origination-api.yml /tmp/origination-api.yml
+          if [ -n "$endpoint" ]; then
+            printf '            endpoint: %s\n' "$endpoint" >> /tmp/origination-api.yml
+          fi
+          if [ -n "$headers" ]; then
+            printf '            headers: %s\n' "$headers" >> /tmp/origination-api.yml
+          fi
+          curl --fail --request PUT --data-binary @/tmp/origination-api.yml "$key_url"
   - target:
       kind: NetworkPolicy
       name: origination-api-ingress
